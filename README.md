@@ -1,72 +1,53 @@
 # ReadPilot
 
-ReadPilot is an AI-assisted PDF reading tool designed to act as a companion for focused reading. Unlike standard chat-with-PDF tools that ingest the entire document at once, ReadPilot implements a "context window" that follows your reading progress. It automatically selects the pages around your current view to provide relevant, grounded answers from the LLM.
+LLM-assisted PDF reader that provides context-aware document interaction by automatically selecting relevant pages based on your current view.
 
-## Core Concepts
+## Features
 
-- **Context Awareness**: The system tracks your current page and maintains a sliding window of context (e.g., current page ± 3 pages).
-- **On-Demand Processing**: Pages are extracted and processed only when needed, ensuring efficiency and relevance.
-- **Focused Q&A**: User queries are answered based specifically on the currently selected page range, reducing hallucinations and improving precision.
+- **Context-Aware Chat**: Automatically uses pages around the current viewport as LLM context.
+- **Large PDF Support**: Smooth navigation and reading for large documents.
+- **Integrated Sidebar**: Chat with the document directly while reading.
 
 ## Quick Start
 
-### Backend Setup
+### Using Just (Recommended)
 
-1. Navigate to the backend directory:
+```bash
+just install
+just dev
+```
 
-   ```bash
-   cd backend
-   ```
+### Using Docker
 
-2. Install dependencies:
+```bash
+docker compose up --build
+```
 
-   ```bash
-   uv sync
-   ```
+### Manual Setup
 
-3. Start the API server:
+#### Backend (Python/uv)
 
-   ```bash
-   uv run uvicorn main:app --reload --port 8000
-   ```
+```bash
+cd backend
+uv sync
+uv run uvicorn main:app --reload --port 8000
+```
 
-The API will be available at <http://localhost:8000>.
+#### Frontend (Node.js)
 
-### Frontend Setup
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-1. Navigate to the frontend directory:
-
-   ```bash
-   cd frontend
-   ```
-
-2. Install dependencies:
-
-   ```bash
-   npm install
-   ```
-
-3. Start the development server:
-
-   ```bash
-   npm run dev
-   ```
-
-Open your browser at <http://localhost:5173>.
+- API: <http://localhost:8000>
+- Web: <http://localhost:5173>
 
 ## Configuration
 
-### Environment Variables (Backend)
+Settings can be managed via the **API Settings** in the UI or environment variables in `backend/.env`:
 
-You can configure the backend using environment variables or a `.env` file:
-
-- `OPENAI_API_KEY`: Your API key for the LLM provider.
-- `OPENAI_BASE_URL`: Custom API endpoint URL (optional).
-
-### User Settings (Frontend)
-
-Click the "API Settings" button in the application to configure:
-
-- **API Key**: Overrides the backend environment variable if set.
-- **Base URL**: Custom endpoint URL.
-- **Model**: The LLM model to use. Defaults to `gpt-5.2`.
+- `OPENAI_API_KEY`
+- `OPENAI_BASE_URL` (optional)
+- `MODEL_NAME` (default: gpt-5.2)
