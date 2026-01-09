@@ -1,0 +1,31 @@
+.DS_Store
+.env
+.env.*
+*.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+.python-version
+
+# Node / Vite
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# Coverage
+coverage/
+
+# AI Agents
+CLAUDE.md
+.claude/
+AGENTS.md
+GEMINI.md
