@@ -10,6 +10,7 @@ export interface DocumentRecord {
   totalPages?: number;
   lastSessionId?: string;
   fileHandle?: FileSystemFileHandle | null;
+  fileBlob?: Blob | null;
 }
 
 export interface SessionRecord {

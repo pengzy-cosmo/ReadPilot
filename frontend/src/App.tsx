@@ -33,6 +33,8 @@ import {
   type StoredMessage,
 } from "@/lib/readingStore";
 
+const MAX_CACHED_FILE_BYTES = 25 * 1024 * 1024;
+
 function App() {
   const [file, setFile] = useState<File | null>(null);
   const [pdfId, setPdfId] = useState<string | null>(null);
@@ -60,6 +62,27 @@ function App() {
   } | null>(null);
   const persistedCountRef = useRef(0);
   const sessionRef = useRef<string | null>(null);
+  const recoverPdfId = useCallback(async () => {
+    if (!file) return null;
+    setIsUploading(true);
+    try {
+      const info = await uploadPDF(file);
+      setPdfId(info.pdf_id);
+      setPdfInfo(info);
+      if (info.outline.length > 0) {
+        setOutline(formatOutline(info.outline));
+      } else {
+        setOutline(undefined);
+      }
+      return info.pdf_id;
+    } catch (error) {
+      console.error("Failed to re-upload PDF:", error);
+      toast.error("Failed to re-upload PDF to server.");
+      return null;
+    } finally {
+      setIsUploading(false);
+    }
+  }, [file]);
   const {
     messages,
     isLoading,
@@ -67,7 +90,7 @@ function App() {
     streamingMeta,
     sendMessage,
     replaceMessages,
-  } = useChat(apiConfig);
+  } = useChat(apiConfig, { onRecoverPdfId: recoverPdfId });
 
   const refreshRecentDocs = useCallback(async () => {
     const docs = await getRecentDocuments(12);
@@ -120,8 +143,13 @@ function App() {
         params;
       const nextDocKey = buildDocKey(file);
       if (expectedDocKey && expectedDocKey !== nextDocKey) {
-        toast.error("Selected file does not match the expected document.");
-        return;
+        const proceed = window.confirm(
+          "Selected file does not match the expected document. Open it as a new document?"
+        );
+        if (!proceed) {
+          toast.error("Open canceled.");
+          return;
+        }
       }
 
       const existing = await getDocument(nextDocKey);
@@ -146,6 +174,7 @@ function App() {
         totalPages: existing?.totalPages,
         lastSessionId: targetSessionId,
         fileHandle: handle ?? existing?.fileHandle ?? null,
+        fileBlob: file.size <= MAX_CACHED_FILE_BYTES ? file : null,
       };
 
       await upsertDocument(record);
@@ -210,6 +239,26 @@ function App() {
       });
     },
     [ensureHandlePermission, openDocument]
+  );
+
+  const openFromBlob = useCallback(
+    async (
+      record: DocumentRecord,
+      options?: { sessionId?: string; createNewSession?: boolean }
+    ) => {
+      if (!record.fileBlob) return;
+      const file = new File([record.fileBlob], record.fileName, {
+        type: "application/pdf",
+        lastModified: record.lastModified,
+      });
+      await openDocument({
+        file,
+        expectedDocKey: record.docKey,
+        sessionId: options?.sessionId,
+        createNewSession: options?.createNewSession,
+      });
+    },
+    [openDocument]
   );
 
   const openFilePicker = useCallback(
@@ -407,13 +456,17 @@ function App() {
         });
         return;
       }
+      if (record.fileBlob) {
+        await openFromBlob(record, options);
+        return;
+      }
       await openFilePicker({
         expectedDocKey: nextDocKey,
         sessionId: options?.sessionId,
         createNewSession: options?.createNewSession,
       });
     },
-    [openFilePicker, openFromHandle]
+    [openFilePicker, openFromBlob, openFromHandle]
   );
 
   const handleNewSession = useCallback(async () => {
