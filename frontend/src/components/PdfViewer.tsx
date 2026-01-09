@@ -20,10 +20,11 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
 
 interface PdfViewerProps {
   file: File | null;
-  onFileChange: (file: File | null) => void;
+  onRequestOpenFile: () => void;
   pageRange: { start: number; end: number };
   onPageRangeChange: (range: { start: number; end: number }) => void;
   onCurrentPageChange?: (page: number) => void;
+  initialPage?: number;
   autoFollow?: boolean;
   contextWindow?: number;
 }
@@ -207,10 +208,11 @@ function ThumbnailItem({
 
 export function PdfViewer({
   file,
-  onFileChange,
+  onRequestOpenFile,
   pageRange,
   onPageRangeChange,
   onCurrentPageChange,
+  initialPage,
   autoFollow = true,
   contextWindow = 3,
 }: PdfViewerProps) {
@@ -232,6 +234,7 @@ export function PdfViewer({
   const [thumbnailAnchor, setThumbnailAnchor] = useState<number | null>(null);
   const fitModeRef = useRef<FitMode>(fitMode);
   const [rangeInput, setRangeInput] = useState({ start: "1", end: "1" });
+  const initialPageRef = useRef<number | null>(initialPage ?? null);
   const fileKey = useMemo(() => {
     if (!file) return "empty";
     return `${file.name}-${file.size}-${file.lastModified}`;
@@ -267,15 +270,9 @@ export function PdfViewer({
     scrollToPage(nextPage);
   }, [currentPage, numPages, pageInput, scrollToPage]);
 
-  const handleFileSelect = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const selectedFile = e.target.files?.[0];
-      if (selectedFile && selectedFile.type === "application/pdf") {
-        onFileChange(selectedFile);
-      }
-    },
-    [onFileChange]
-  );
+  useEffect(() => {
+    initialPageRef.current = initialPage ?? null;
+  }, [initialPage]);
 
   const clampRange = useCallback(
     (nextStart: number, nextEnd: number) => {
@@ -485,18 +482,9 @@ export function PdfViewer({
   const renderToolbar = useMemo(
     () => (
       <div className="flex items-center gap-2 p-2 border-b bg-muted/50 flex-wrap">
-        <input
-          type="file"
-          accept="application/pdf"
-          onChange={handleFileSelect}
-          className="hidden"
-          id="pdf-upload"
-        />
-        <label htmlFor="pdf-upload">
-          <Button variant="outline" size="sm" asChild>
-            <span>Open PDF</span>
-          </Button>
-        </label>
+        <Button variant="outline" size="sm" onClick={onRequestOpenFile}>
+          Open PDF
+        </Button>
 
         {numPages > 0 && (
           <>
@@ -623,13 +611,13 @@ export function PdfViewer({
       commitRangeEnd,
       commitRangeStart,
       handleContextWindowChange,
-      handleFileSelect,
       handlePageInputCommit,
       handleRangeEndChange,
       handleRangeStartChange,
       handleToggleFit,
       handleZoomIn,
       handleZoomOut,
+      onRequestOpenFile,
       localAutoFollow,
       numPages,
       pageInput,
@@ -682,6 +670,14 @@ export function PdfViewer({
     eventBus.on("pagesinit", () => {
       pdfViewer.currentScaleValue = fitModeRef.current;
       setScale(pdfViewer.currentScale);
+      const targetPage = initialPageRef.current;
+      if (
+        targetPage &&
+        targetPage >= 1 &&
+        targetPage <= pdfViewer.pagesCount
+      ) {
+        pdfViewer.currentPageNumber = targetPage;
+      }
     });
 
     eventBus.on("pagechanging", (event: { pageNumber: number }) => {

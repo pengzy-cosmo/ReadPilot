@@ -8,11 +8,6 @@ ReadPilot is an AI-assisted PDF reading tool designed to act as a companion for 
 - **On-Demand Processing**: Pages are extracted and processed only when needed, ensuring efficiency and relevance.
 - **Focused Q&A**: User queries are answered based specifically on the currently selected page range, reducing hallucinations and improving precision.
 
-## Tech Stack
-
-- **Backend**: Python (FastAPI), PyMuPDF (PDF processing), OpenAI API (LLM integration).
-- **Frontend**: React 19, Vite, TypeScript, Tailwind CSS, react-pdf / pdfjs-dist.
-
 ## Quick Start
 
 ### Backend Setup

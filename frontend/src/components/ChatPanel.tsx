@@ -19,7 +19,11 @@ interface PageRangeMeta {
 interface ChatPanelProps {
   onSendMessage: (message: string) => Promise<void>;
   onSummarize: () => void;
+  onNewSession: () => void;
   onClear: () => void;
+  onOpenSessions: () => void;
+  sessionTitle?: string | null;
+  sessionSubtitle?: string | null;
   messages: Message[];
   isLoading: boolean;
   streamingContent: string;
@@ -30,7 +34,11 @@ interface ChatPanelProps {
 export function ChatPanel({
   onSendMessage,
   onSummarize,
+  onNewSession,
   onClear,
+  onOpenSessions,
+  sessionTitle,
+  sessionSubtitle,
   messages,
   isLoading,
   streamingContent,
@@ -69,6 +77,11 @@ export function ChatPanel({
     }
   };
 
+  const handleNewSession = () => {
+    setInput('');
+    onNewSession();
+  };
+
   const handleClear = () => {
     setInput('');
     onClear();
@@ -86,9 +99,37 @@ export function ChatPanel({
     <div className="flex flex-col h-full min-h-0 overflow-hidden">
       {/* Header */}
       <div className="p-3 border-b bg-muted/50">
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold">Chat</h2>
-          <div className="flex items-center gap-2">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+              Chat
+            </div>
+            <div className="font-medium truncate">
+              {sessionTitle || 'New Session'}
+            </div>
+            {sessionSubtitle && (
+              <div className="text-xs text-muted-foreground truncate">
+                {sessionSubtitle}
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onOpenSessions}
+              disabled={disabled}
+            >
+              Sessions
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleNewSession}
+              disabled={disabled || isLoading}
+            >
+              New Session
+            </Button>
             <Button
               variant="ghost"
               size="sm"

@@ -39,6 +39,12 @@ export function useChat(apiConfig: ApiConfig) {
   // Keep ref in sync with state for use in callbacks
   messagesRef.current = messages;
 
+  const replaceMessages = useCallback((next: Message[]) => {
+    setMessages(next);
+    setStreamingContent("");
+    setStreamingMeta(null);
+  }, []);
+
   const sendMessage = useCallback(
     async (
       pdfId: string,
@@ -151,5 +157,6 @@ export function useChat(apiConfig: ApiConfig) {
     streamingMeta,
     sendMessage,
     clearMessages,
+    replaceMessages,
   };
 }
