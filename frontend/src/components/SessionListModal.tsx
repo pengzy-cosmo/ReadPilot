@@ -83,7 +83,8 @@ export function SessionListModal({
                       </div>
                       <div className="min-w-0">
                         <div className="font-medium truncate">
-                          {session.title || `Session ${sessions.length - index}`}
+                          {session.title ||
+                            `Session ${sessions.length - index}`}
                         </div>
                         <div className="text-xs text-muted-foreground">
                           Updated: {formatTimestamp(session.updatedAt)}

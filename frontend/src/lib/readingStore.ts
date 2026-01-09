@@ -123,7 +123,9 @@ export const getDocument = async (docKey: string) =>
     "readonly",
     (tx) =>
       requestToPromise(
-        tx.objectStore(STORE_DOCUMENTS).get(docKey) as IDBRequest<DocumentRecord>
+        tx
+          .objectStore(STORE_DOCUMENTS)
+          .get(docKey) as IDBRequest<DocumentRecord>
       )
   );
 
@@ -149,18 +151,14 @@ export const updateDocument = async (
 };
 
 export const getRecentDocuments = async (limit = 12) =>
-  runTransaction<DocumentRecord[]>(
-    STORE_DOCUMENTS,
-    "readonly",
-    async (tx) => {
-      const store = tx.objectStore(STORE_DOCUMENTS);
-      const all = (await requestToPromise(
-        store.getAll() as IDBRequest<DocumentRecord[]>
-      )) as DocumentRecord[];
-      all.sort((a, b) => b.lastOpenedAt - a.lastOpenedAt);
-      return all.slice(0, limit);
-    }
-  );
+  runTransaction<DocumentRecord[]>(STORE_DOCUMENTS, "readonly", async (tx) => {
+    const store = tx.objectStore(STORE_DOCUMENTS);
+    const all = (await requestToPromise(
+      store.getAll() as IDBRequest<DocumentRecord[]>
+    )) as DocumentRecord[];
+    all.sort((a, b) => b.lastOpenedAt - a.lastOpenedAt);
+    return all.slice(0, limit);
+  });
 
 export const createSession = async (docKey: string, title?: string | null) =>
   runTransaction<SessionRecord>(STORE_SESSIONS, "readwrite", async (tx) => {
@@ -176,28 +174,21 @@ export const createSession = async (docKey: string, title?: string | null) =>
   });
 
 export const listSessions = async (docKey: string) =>
-  runTransaction<SessionRecord[]>(
-    STORE_SESSIONS,
-    "readonly",
-    async (tx) => {
-      const store = tx.objectStore(STORE_SESSIONS);
-      const index = store.index("by_docKey");
-      const items = (await requestToPromise(
-        index.getAll(docKey) as IDBRequest<SessionRecord[]>
-      )) as SessionRecord[];
-      items.sort((a, b) => b.updatedAt - a.updatedAt);
-      return items;
-    }
-  );
+  runTransaction<SessionRecord[]>(STORE_SESSIONS, "readonly", async (tx) => {
+    const store = tx.objectStore(STORE_SESSIONS);
+    const index = store.index("by_docKey");
+    const items = (await requestToPromise(
+      index.getAll(docKey) as IDBRequest<SessionRecord[]>
+    )) as SessionRecord[];
+    items.sort((a, b) => b.updatedAt - a.updatedAt);
+    return items;
+  });
 
 export const getSession = async (sessionId: string) =>
-  runTransaction<SessionRecord | undefined>(
-    STORE_SESSIONS,
-    "readonly",
-    (tx) =>
-      requestToPromise(
-        tx.objectStore(STORE_SESSIONS).get(sessionId) as IDBRequest<SessionRecord>
-      )
+  runTransaction<SessionRecord | undefined>(STORE_SESSIONS, "readonly", (tx) =>
+    requestToPromise(
+      tx.objectStore(STORE_SESSIONS).get(sessionId) as IDBRequest<SessionRecord>
+    )
   );
 
 export const touchSession = async (sessionId: string) => {
@@ -207,9 +198,7 @@ export const touchSession = async (sessionId: string) => {
       store.get(sessionId) as IDBRequest<SessionRecord>
     )) as SessionRecord | undefined;
     if (!existing) return;
-    await requestToPromise(
-      store.put({ ...existing, updatedAt: Date.now() })
-    );
+    await requestToPromise(store.put({ ...existing, updatedAt: Date.now() }));
   });
 };
 
@@ -234,16 +223,20 @@ export const updateSessionTitle = async (
 };
 
 export const deleteSession = async (sessionId: string) => {
-  await runTransaction([STORE_SESSIONS, STORE_MESSAGES], "readwrite", async (tx) => {
-    const sessionStore = tx.objectStore(STORE_SESSIONS);
-    const messageStore = tx.objectStore(STORE_MESSAGES);
-    const messageIndex = messageStore.index("by_sessionId");
-    const keys = (await requestToPromise(
-      messageIndex.getAllKeys(sessionId) as IDBRequest<IDBValidKey[]>
-    )) as IDBValidKey[];
-    keys.forEach((key) => messageStore.delete(key));
-    await requestToPromise(sessionStore.delete(sessionId));
-  });
+  await runTransaction(
+    [STORE_SESSIONS, STORE_MESSAGES],
+    "readwrite",
+    async (tx) => {
+      const sessionStore = tx.objectStore(STORE_SESSIONS);
+      const messageStore = tx.objectStore(STORE_MESSAGES);
+      const messageIndex = messageStore.index("by_sessionId");
+      const keys = (await requestToPromise(
+        messageIndex.getAllKeys(sessionId) as IDBRequest<IDBValidKey[]>
+      )) as IDBValidKey[];
+      keys.forEach((key) => messageStore.delete(key));
+      await requestToPromise(sessionStore.delete(sessionId));
+    }
+  );
 };
 
 export const clearSessionMessages = async (sessionId: string) => {
@@ -284,16 +277,12 @@ export const appendMessages = async (
 };
 
 export const loadMessages = async (sessionId: string) =>
-  runTransaction<StoredMessage[]>(
-    STORE_MESSAGES,
-    "readonly",
-    async (tx) => {
-      const store = tx.objectStore(STORE_MESSAGES);
-      const index = store.index("by_sessionId");
-      const items = (await requestToPromise(
-        index.getAll(sessionId) as IDBRequest<StoredMessage[]>
-      )) as StoredMessage[];
-      items.sort((a, b) => a.createdAt - b.createdAt);
-      return items;
-    }
-  );
+  runTransaction<StoredMessage[]>(STORE_MESSAGES, "readonly", async (tx) => {
+    const store = tx.objectStore(STORE_MESSAGES);
+    const index = store.index("by_sessionId");
+    const items = (await requestToPromise(
+      index.getAll(sessionId) as IDBRequest<StoredMessage[]>
+    )) as StoredMessage[];
+    items.sort((a, b) => a.createdAt - b.createdAt);
+    return items;
+  });

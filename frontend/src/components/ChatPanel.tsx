@@ -111,7 +111,10 @@ export function ChatPanel({
 
   const renderMarkdown = (content: string, showCaret = false) => (
     <div className="prose prose-sm dark:prose-invert max-w-none break-words">
-      <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm, remarkMath]}
+        rehypePlugins={[rehypeKatex]}
+      >
         {content}
       </ReactMarkdown>
       {showCaret && (
@@ -217,7 +220,10 @@ export function ChatPanel({
             return (
               <div
                 key={index}
-                className={cn("flex gap-3", isUser ? "flex-row-reverse" : "flex-row")}
+                className={cn(
+                  "flex gap-3",
+                  isUser ? "flex-row-reverse" : "flex-row"
+                )}
               >
                 <div
                   className={cn(
@@ -227,7 +233,11 @@ export function ChatPanel({
                       : "bg-muted text-muted-foreground"
                   )}
                 >
-                  {isUser ? <User className="size-4" /> : <Bot className="size-4" />}
+                  {isUser ? (
+                    <User className="size-4" />
+                  ) : (
+                    <Bot className="size-4" />
+                  )}
                 </div>
 
                 <div
@@ -251,7 +261,9 @@ export function ChatPanel({
                     )}
                   >
                     {isUser ? (
-                      <div className="whitespace-pre-wrap">{message.content}</div>
+                      <div className="whitespace-pre-wrap">
+                        {message.content}
+                      </div>
                     ) : (
                       renderMarkdown(message.content)
                     )}

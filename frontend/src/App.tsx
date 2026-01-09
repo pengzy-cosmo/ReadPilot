@@ -125,11 +125,14 @@ function App() {
     return trimmed.length > 60 ? `${trimmed.slice(0, 60)}…` : trimmed;
   }, []);
 
-  const formatSessionSubtitle = useCallback((session?: SessionRecord | null) => {
-    if (!session) return null;
-    const updated = new Date(session.updatedAt).toLocaleString();
-    return `Updated · ${updated}`;
-  }, []);
+  const formatSessionSubtitle = useCallback(
+    (session?: SessionRecord | null) => {
+      if (!session) return null;
+      const updated = new Date(session.updatedAt).toLocaleString();
+      return `Updated · ${updated}`;
+    },
+    []
+  );
 
   const openDocument = useCallback(
     async (params: {
@@ -366,8 +369,7 @@ function App() {
       persistedCountRef.current = mapped.length;
       sessionRef.current = sessionId;
       replaceMessages(mapped);
-      const derivedTitle =
-        session?.title ?? deriveSessionTitle(mapped) ?? null;
+      const derivedTitle = session?.title ?? deriveSessionTitle(mapped) ?? null;
       if (!session?.title && derivedTitle) {
         void updateSessionTitle(sessionId, derivedTitle);
       }
@@ -588,7 +590,11 @@ function App() {
           />
 
           {/* Chat Panel - Right Panel */}
-          <Panel defaultSize={25} minSize={25} className="bg-background relative h-full flex flex-col min-h-0 min-w-0">
+          <Panel
+            defaultSize={25}
+            minSize={25}
+            className="bg-background relative h-full flex flex-col min-h-0 min-w-0"
+          >
             <ChatPanel
               onSendMessage={handleSendMessage}
               onSummarize={handleSummarize}
