@@ -5,18 +5,16 @@ import type {
   PDFDocumentProxy,
   PDFPageProxy,
 } from "pdfjs-dist/types/src/display/api";
-import { EventBus, PDFLinkService, PDFViewer } from "pdfjs-dist/web/pdf_viewer";
-import "pdfjs-dist/web/pdf_viewer.css";
+import { EventBus, PDFLinkService, PDFViewer } from "pdfjs-dist/web/pdf_viewer.mjs";
 
 import { Group, Panel, Separator } from "react-resizable-panels";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { memo } from "react";
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  "pdfjs-dist/build/pdf.worker.min.mjs",
-  import.meta.url
-).toString();
+const PDFJS_CDN_BASE = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/`;
+pdfjsLib.GlobalWorkerOptions.workerSrc = `${PDFJS_CDN_BASE}build/pdf.worker.min.mjs`;
 
 interface PdfViewerProps {
   file: File | null;
@@ -36,7 +34,13 @@ type OutlineNodeInput = {
   items?: OutlineNodeInput[];
 };
 
-type OutlineNode = OutlineNodeInput & { id: string };
+type OutlineNode = {
+  id: string;
+  title: string;
+  dest: unknown;
+  url?: string | null;
+  items?: OutlineNode[];
+};
 
 type OutlineFlatItem = {
   id: string;
@@ -57,12 +61,8 @@ type ThumbnailItemProps = {
   onSelect: (pageNumber: number, isRange: boolean) => void;
 };
 
-const ANNOTATION_MODE =
-  (pdfjsLib as { AnnotationMode?: { ENABLE: number } }).AnnotationMode
-    ?.ENABLE ?? 2;
-const TEXT_LAYER_MODE =
-  (pdfjsLib as { TextLayerMode?: { ENABLE: number } }).TextLayerMode?.ENABLE ??
-  1;
+const ANNOTATION_MODE = 2; // ENABLE
+const TEXT_LAYER_MODE = 1; // ENABLE
 
 const CONTEXT_WINDOW_MIN = 1;
 const CONTEXT_WINDOW_MAX = 12;
@@ -75,7 +75,9 @@ const assignOutlineIds = (
   items.map((item, index) => {
     const id = `${prefix}-${index}`;
     return {
-      ...item,
+      title: item.title,
+      dest: item.dest,
+      url: item.url,
       id,
       items: item.items ? assignOutlineIds(item.items, id) : undefined,
     };
@@ -136,15 +138,18 @@ function ThumbnailItem({
 
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
-        const transform =
-          outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : null;
+        const transform: [number, number, number, number, number, number] | undefined =
+          outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : undefined;
+
         const renderTask = page.render({
           canvasContext: ctx,
           viewport,
           transform,
         });
+
         renderTaskRef.current = renderTask;
         await renderTask.promise;
+
         if (!cancelled) {
           setIsRendered(true);
         }
@@ -177,26 +182,23 @@ function ThumbnailItem({
     <button
       ref={wrapperRef}
       type="button"
-      className={`group w-full rounded-lg border p-2 text-left transition ${
-        isSelected
-          ? "border-primary bg-primary/10"
-          : "border-border bg-card hover:bg-muted/60"
-      } ${isCurrent ? "ring-1 ring-primary/60" : ""}`}
+      className={`group w-full rounded-lg border p-2 text-left transition ${isSelected
+        ? "border-primary bg-primary/10"
+        : "border-border bg-card hover:bg-muted/60"
+        } ${isCurrent ? "ring-1 ring-primary/60" : ""}`}
       onClick={(event) => onSelect(pageNumber, event.shiftKey)}
       title={`Select page ${pageNumber}`}
     >
       <div className="w-full flex items-center justify-center">
         <div
-          className={`w-full rounded-md bg-muted/60 ${
-            isRendered ? "hidden" : "block"
-          }`}
+          className={`w-full rounded-md bg-muted/60 ${isRendered ? "hidden" : "block"
+            }`}
           style={{ aspectRatio: "3 / 4" }}
         />
         <canvas
           ref={canvasRef}
-          className={`block rounded-md ${
-            isRendered ? "opacity-100" : "opacity-0"
-          }`}
+          className={`block rounded-md ${isRendered ? "opacity-100" : "opacity-0"
+            }`}
         />
       </div>
       <div className="mt-1 text-xs text-muted-foreground text-right">
@@ -205,6 +207,8 @@ function ThumbnailItem({
     </button>
   );
 }
+
+const MemoizedThumbnailItem = memo(ThumbnailItem);
 
 export function PdfViewer({
   file,
@@ -239,6 +243,7 @@ export function PdfViewer({
     if (!file) return "empty";
     return `${file.name}-${file.size}-${file.lastModified}`;
   }, [file]);
+
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<HTMLDivElement | null>(null);
@@ -356,14 +361,14 @@ export function PdfViewer({
     const pdf = pdfRef.current;
     if (!pdf || !dest) return null;
     try {
-      let destination = dest;
+      let destination: unknown = dest;
       if (typeof destination === "string") {
         destination = await pdf.getDestination(destination);
       }
       if (!Array.isArray(destination) || destination.length === 0) {
         return null;
       }
-      const [ref] = destination;
+      const [ref] = destination as unknown[];
       if (typeof ref === "number") {
         return ref + 1;
       }
@@ -580,9 +585,8 @@ export function PdfViewer({
                 Auto
               </Button>
               <div
-                className={`flex items-center gap-2 ml-2 ${
-                  localAutoFollow ? "" : "opacity-60"
-                }`}
+                className={`flex items-center gap-2 ml-2 ${localAutoFollow ? "" : "opacity-60"
+                  }`}
               >
                 <input
                   type="range"
@@ -739,7 +743,14 @@ export function PdfViewer({
       await cleanupDocument();
       try {
         const buffer = await file.arrayBuffer();
-        const loadingTask = pdfjsLib.getDocument({ data: buffer });
+        const loadingTask = pdfjsLib.getDocument({
+          data: buffer,
+          wasmUrl: `${PDFJS_CDN_BASE}wasm/`,
+          cMapUrl: `${PDFJS_CDN_BASE}cmaps/`,
+          cMapPacked: true,
+          standardFontDataUrl: `${PDFJS_CDN_BASE}standard_fonts/`,
+          iccUrl: `${PDFJS_CDN_BASE}iccs/`,
+        });
         loadingTaskRef.current = loadingTask;
         const pdf = await loadingTask.promise;
         pdfRef.current = pdf;
@@ -807,7 +818,7 @@ export function PdfViewer({
     }
 
     try {
-      let destination = item.dest;
+      let destination: unknown = item.dest;
       if (typeof destination === "string") {
         destination = await pdf.getDestination(destination);
       }
@@ -816,7 +827,8 @@ export function PdfViewer({
         return;
       }
 
-      const [ref] = destination;
+      const destinationArray = destination as unknown[];
+      const [ref] = destinationArray;
       let pageNumber: number | null = null;
       if (typeof ref === "number") {
         pageNumber = ref + 1;
@@ -828,7 +840,7 @@ export function PdfViewer({
 
       viewer.scrollPageIntoView({
         pageNumber,
-        destArray: destination,
+        destArray: destinationArray,
       });
     } catch (error) {
       console.warn("Failed to resolve outline destination:", error);
@@ -838,6 +850,7 @@ export function PdfViewer({
     }
   }, []);
 
+  // Helper for recursive outline render
   const renderOutlineItems = useCallback(
     (items: OutlineNode[]) => {
       if (!items.length) return null;
@@ -880,142 +893,114 @@ export function PdfViewer({
     [handleOutlineClick, handleOutlineSelectRange]
   );
 
-  const renderStatus = () => {
-    if (!file) {
-      return (
-        <div className="flex items-center justify-center h-64 text-muted-foreground">
-          Click "Open PDF" to load a document
-        </div>
-      );
-    }
-    if (isLoading) {
-      return (
-        <div className="flex items-center justify-center h-64 text-muted-foreground">
-          Loading PDF...
-        </div>
-      );
-    }
-    if (loadError) {
-      return (
-        <div className="flex items-center justify-center h-64 text-destructive">
-          {loadError}
-        </div>
-      );
-    }
-    return null;
-  };
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col">
-      {renderToolbar}
-      <div className="flex-1 min-h-0 overflow-hidden bg-muted/30">
-        <Group
-          orientation="horizontal"
-          className="flex h-full min-h-0 min-w-0"
-        >
-          {showSidebar && (
-            <Panel
-              defaultSize="22%"
-              minSize="15%"
-              maxSize="40%"
-              className="min-w-0"
-            >
-              <div className="flex flex-col bg-muted/30 h-full min-h-0">
-                <div className="p-2 border-b text-sm flex items-center gap-2">
-                  {hasOutline && (
-                    <Button
-                      variant={sidebarTab === "outline" ? "default" : "ghost"}
-                      size="sm"
-                      onClick={() => setSidebarTab("outline")}
-                    >
-                      Outline
-                    </Button>
-                  )}
-                  <Button
-                    variant={sidebarTab === "thumbnails" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setSidebarTab("thumbnails")}
-                  >
-                    Thumbnails
-                  </Button>
-                  <div className="ml-auto">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowSidebar(false)}
-                    >
-                      ×
-                    </Button>
-                  </div>
-                </div>
-                <div
-                  className="flex-1 min-h-0 overflow-auto"
-                  ref={thumbnailRootRef}
-                >
-                  {sidebarTab === "outline" && hasOutline ? (
-                    <div className="p-2 text-sm pdf-outline">
-                      {renderOutlineItems(outlineItems)}
-                    </div>
-                  ) : (
-                    <div className="p-2 space-y-2">
-                      <div className="text-xs text-muted-foreground">
-                        Click to select, Shift-click for range.
-                      </div>
-                      <div className="grid gap-2">
-                        {Array.from({ length: numPages }, (_, index) => {
-                          const pageNumber = index + 1;
-                          return (
-                            <ThumbnailItem
-                              key={`thumb-${fileKey}-${pageNumber}`}
-                              pageNumber={pageNumber}
-                              pdf={pdfRef.current}
-                              rootRef={thumbnailRootRef}
-                              isSelected={
-                                pageNumber >= pageRange.start &&
-                                pageNumber <= pageRange.end
-                              }
-                              isCurrent={pageNumber === currentPage}
-                              onSelect={handleThumbnailSelect}
-                            />
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </Panel>
-          )}
-
-          {showSidebar && (
-            <Separator
-              style={{
-                width: "6px",
-                background: "var(--border)",
-                cursor: "col-resize",
-              }}
-              className="shrink-0"
-            />
-          )}
-
+    <Group orientation="horizontal" className="h-full">
+      {/* Sidebar Panel */}
+      {showSidebar && numPages > 0 && (
+        <>
           <Panel
-            defaultSize={showSidebar ? "78%" : "100%"}
-            minSize="30%"
-            className="min-w-0"
+            defaultSize="280px"
+            minSize="220px"
+            maxSize="400px"
+            className="flex flex-col bg-muted/10 !shrink-0"
           >
-            <div className="relative h-full min-h-0 overflow-hidden">
-              <div
-                ref={containerRef}
-                className="overflow-auto pdfViewerContainer px-4 py-4"
-                style={{ position: "absolute", inset: 0 }}
+            <div className="flex items-center border-b">
+              <button
+                className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${sidebarTab === "outline"
+                  ? "border-b-2 border-primary text-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  }`}
+                onClick={() => setSidebarTab("outline")}
               >
-                {renderStatus()}
-                <div ref={viewerRef} className="pdfViewer" />
-              </div>
+                Outline
+              </button>
+              <button
+                className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${sidebarTab === "thumbnails"
+                  ? "border-b-2 border-primary text-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  }`}
+                onClick={() => setSidebarTab("thumbnails")}
+              >
+                Thumbnails
+              </button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9"
+                onClick={() => setShowSidebar(false)}
+              >
+                <span className="sr-only">Close sidebar</span>
+                &times;
+              </Button>
+            </div>
+
+            <div className="flex-1 overflow-auto p-2">
+              {sidebarTab === "outline" ? (
+                hasOutline ? (
+                  <div className="space-y-1 pdf-outline">
+                    {renderOutlineItems(outlineItems)}
+                  </div>
+                ) : (
+                  <div className="p-4 text-center text-sm text-muted-foreground">
+                    No outline available
+                  </div>
+                )
+              ) : (
+                <div className="space-y-2" ref={thumbnailRootRef}>
+                  {Array.from({ length: numPages }, (_, i) => i + 1).map(
+                    (page) => (
+                      <MemoizedThumbnailItem
+                        key={`${fileKey}-${page}`}
+                        pageNumber={page}
+                        pdf={pdfRef.current}
+                        rootRef={thumbnailRootRef}
+                        isSelected={
+                          page >= pageRange.start && page <= pageRange.end
+                        }
+                        isCurrent={currentPage === page}
+                        onSelect={handleThumbnailSelect}
+                      />
+                    )
+                  )}
+                </div>
+              )}
             </div>
           </Panel>
-        </Group>
-      </div>
-    </div>
+          <Separator className="w-2 bg-border/50 hover:bg-primary/50 transition-colors cursor-col-resize z-50 flex items-center justify-center">
+            <div className="h-8 w-1 bg-border rounded-full" />
+          </Separator>
+        </>
+      )}
+
+      {/* Main Viewer Panel */}
+      <Panel className="relative flex flex-col bg-muted/30">
+        {renderToolbar}
+        <div className="flex-1 relative w-full h-full overflow-hidden">
+          <div ref={containerRef} className="absolute inset-0 overflow-auto p-4 pdfViewerContainer">
+            <div className="pdfViewer" ref={viewerRef} />
+            {isLoading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm z-10">
+                <div className="flex flex-col items-center gap-2">
+                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+                  <span className="text-sm font-medium">Loading PDF...</span>
+                </div>
+              </div>
+            )}
+            {loadError && (
+              <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-20">
+                <div className="bg-destructive/10 text-destructive p-4 rounded-lg flex flex-col items-center gap-2">
+                  <p className="font-medium">Error</p>
+                  <p>{loadError}</p>
+                  <Button variant="outline" onClick={onRequestOpenFile}>
+                    Try another file
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </Panel>
+    </Group>
   );
 }

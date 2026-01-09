@@ -1,15 +1,24 @@
-import { useState, useRef, useEffect } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import remarkMath from 'remark-math';
-import rehypeKatex from 'rehype-katex';
-import 'katex/dist/katex.min.css';
+import { useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css";
+import {
+  Bot,
+  History,
+  Plus,
+  SendHorizontal,
+  Sparkles,
+  Trash2,
+  User,
+} from "lucide-react";
 
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Card } from '@/components/ui/card';
-import type { Message } from '@/hooks/useChat';
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
+import type { Message } from "@/hooks/useChat";
 
 interface PageRangeMeta {
   pageStart: number;
@@ -45,7 +54,7 @@ export function ChatPanel({
   streamingMeta,
   disabled,
 }: ChatPanelProps) {
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState("");
   const scrollRootRef = useRef<HTMLDivElement>(null);
   const scrollViewportRef = useRef<HTMLDivElement | null>(null);
 
@@ -57,191 +66,262 @@ export function ChatPanel({
     }
     const viewport = scrollViewportRef.current;
     if (viewport) {
-      viewport.scrollTop = viewport.scrollHeight;
+      requestAnimationFrame(() => {
+        viewport.scrollTop = viewport.scrollHeight;
+      });
     }
   }, [messages, streamingContent]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isLoading || disabled) return;
-
-    const message = input.trim();
-    setInput('');
-    await onSendMessage(message);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit(e);
-    }
-  };
-
-  const handleNewSession = () => {
-    setInput('');
-    onNewSession();
-  };
-
-  const handleClear = () => {
-    setInput('');
-    onClear();
-  };
 
   const formatPageRange = (meta?: PageRangeMeta | null) => {
     if (!meta) return null;
     if (meta.pageStart === meta.pageEnd) {
-      return `Based on page ${meta.pageStart}`;
+      return `Page ${meta.pageStart}`;
     }
-    return `Based on pages ${meta.pageStart}-${meta.pageEnd}`;
+    return `Pages ${meta.pageStart}-${meta.pageEnd}`;
   };
 
+  const handleSubmitMessage = async () => {
+    if (!input.trim() || isLoading || disabled) return;
+    const message = input.trim();
+    setInput("");
+    await onSendMessage(message);
+  };
+
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    void handleSubmitMessage();
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      void handleSubmitMessage();
+    }
+  };
+
+  const handleNewSession = () => {
+    setInput("");
+    onNewSession();
+  };
+
+  const handleClear = () => {
+    setInput("");
+    onClear();
+  };
+
+  const renderMarkdown = (content: string, showCaret = false) => (
+    <div className="prose prose-sm dark:prose-invert max-w-none break-words">
+      <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+        {content}
+      </ReactMarkdown>
+      {showCaret && (
+        <span className="animate-pulse inline-block w-1.5 h-3.5 bg-primary ml-0.5 align-middle" />
+      )}
+    </div>
+  );
+
+  const showEmptyState = messages.length === 0 && !streamingContent;
+
   return (
-    <div className="flex flex-col h-full min-h-0 overflow-hidden">
-      {/* Header */}
-      <div className="p-3 border-b bg-muted/50">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">
-              Chat
-            </div>
-            <div className="font-medium truncate">
-              {sessionTitle || 'New Session'}
-            </div>
-            {sessionSubtitle && (
-              <div className="text-xs text-muted-foreground truncate">
-                {sessionSubtitle}
-              </div>
-            )}
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onOpenSessions}
-              disabled={disabled}
-            >
-              Sessions
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleNewSession}
-              disabled={disabled || isLoading}
-            >
-              New Session
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleClear}
-              disabled={disabled || isLoading || messages.length === 0}
-            >
-              Clear
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={onSummarize}
-              disabled={disabled || isLoading}
-            >
-              Summarize
-            </Button>
-          </div>
+    <div className="flex-1 flex flex-col min-h-0 bg-background border-l border-border/40 overflow-hidden">
+      <div className="h-14 flex items-center justify-between px-4 border-b border-border/40 bg-muted/20 shrink-0">
+        <div className="min-w-0 pr-4">
+          <h2 className="text-sm font-semibold truncate">
+            {sessionTitle || "New chat"}
+          </h2>
+          <p className="text-xs text-muted-foreground truncate">
+            {sessionSubtitle || "Ready to assist"}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onSummarize}
+            disabled={disabled || isLoading}
+            title="Summarize selected pages"
+            className="h-8 w-8 text-muted-foreground hover:text-primary"
+          >
+            <Sparkles className="size-4" />
+          </Button>
+          <div className="h-4 w-px bg-border/60 mx-1" />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onOpenSessions}
+            disabled={disabled}
+            title="History"
+            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+          >
+            <History className="size-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleNewSession}
+            disabled={disabled || isLoading}
+            title="New session"
+            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+          >
+            <Plus className="size-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleClear}
+            disabled={disabled || isLoading || messages.length === 0}
+            title="Clear chat"
+            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+          >
+            <Trash2 className="size-4" />
+          </Button>
         </div>
       </div>
 
-      {/* Messages */}
-      <ScrollArea className="flex-1 min-h-0 h-full" ref={scrollRootRef}>
-        <div className="space-y-4 p-4">
-          {messages.length === 0 && !streamingContent && (
-            <div className="text-center text-muted-foreground text-sm py-8">
-              {disabled
-                ? 'Open a PDF to start chatting'
-                : 'Ask questions about the selected pages'}
+      <ScrollArea className="flex-1 min-h-0" ref={scrollRootRef}>
+        <div className="flex flex-col px-4 py-6 gap-6 max-w-3xl mx-auto w-full min-h-full justify-end">
+          {showEmptyState && (
+            <div className="flex flex-col items-center justify-center text-center mt-12 gap-4">
+              <div className="size-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+                <Bot className="size-6" />
+              </div>
+              <div>
+                <h3 className="font-medium text-foreground">
+                  {disabled ? "Open a PDF First" : "How can I help you?"}
+                </h3>
+                <p className="text-sm text-muted-foreground mt-1 max-w-xs mx-auto">
+                  {disabled
+                    ? "Upload a document to start analyzing."
+                    : "Ask questions about the content, request summaries, or explore key concepts."}
+                </p>
+              </div>
+              {!disabled && (
+                <div className="flex flex-wrap items-center justify-center gap-2 mt-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs rounded-full bg-background"
+                    onClick={onSummarize}
+                  >
+                    <Sparkles className="size-3 mr-1.5 text-primary" />
+                    Summarize these pages
+                  </Button>
+                </div>
+              )}
             </div>
           )}
 
-          {messages.map((msg, i) => (
-            <Card
-              key={i}
-              className={`p-3 ${
-                msg.role === 'user'
-                  ? 'bg-primary text-primary-foreground ml-8'
-                  : 'bg-muted mr-8'
-              }`}
-            >
-              <div className="text-xs font-medium mb-1 opacity-70">
-                {msg.role === 'user' ? 'You' : 'AI'}
-              </div>
-              {msg.role === 'assistant' && msg.meta && (
-                <div className="text-[11px] text-muted-foreground mb-2">
-                  {formatPageRange(msg.meta)}
+          {messages.map((message, index) => {
+            const isUser = message.role === "user";
+            return (
+              <div
+                key={index}
+                className={cn("flex gap-3", isUser ? "flex-row-reverse" : "flex-row")}
+              >
+                <div
+                  className={cn(
+                    "size-8 shrink-0 rounded-lg flex items-center justify-center text-xs font-medium",
+                    isUser
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground"
+                  )}
+                >
+                  {isUser ? <User className="size-4" /> : <Bot className="size-4" />}
                 </div>
-              )}
-              {msg.role === 'user' ? (
-                <div className="whitespace-pre-wrap text-sm">{msg.content}</div>
-              ) : (
-                <div className="prose prose-sm dark:prose-invert max-w-none">
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm, remarkMath]}
-                    rehypePlugins={[rehypeKatex]}
+
+                <div
+                  className={cn(
+                    "flex flex-col max-w-[85%] gap-1",
+                    isUser ? "items-end" : "items-start"
+                  )}
+                >
+                  {!isUser && message.meta && (
+                    <span className="text-[10px] uppercase font-medium text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
+                      {formatPageRange(message.meta)}
+                    </span>
+                  )}
+
+                  <div
+                    className={cn(
+                      "px-4 py-2.5 rounded-2xl shadow-sm text-sm leading-relaxed",
+                      isUser
+                        ? "bg-primary text-primary-foreground rounded-tr-sm"
+                        : "bg-card border border-border/50 rounded-tl-sm"
+                    )}
                   >
-                    {msg.content}
-                  </ReactMarkdown>
+                    {isUser ? (
+                      <div className="whitespace-pre-wrap">{message.content}</div>
+                    ) : (
+                      renderMarkdown(message.content)
+                    )}
+                  </div>
                 </div>
-              )}
-            </Card>
-          ))}
+              </div>
+            );
+          })}
 
           {streamingContent && (
-            <Card className="p-3 bg-muted mr-8">
-              <div className="text-xs font-medium mb-1 opacity-70">AI</div>
-              {streamingMeta && (
-                <div className="text-[11px] text-muted-foreground mb-2">
-                  {formatPageRange(streamingMeta)}
-                </div>
-              )}
-              <div className="prose prose-sm dark:prose-invert max-w-none">
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm, remarkMath]}
-                  rehypePlugins={[rehypeKatex]}
-                >
-                  {streamingContent}
-                </ReactMarkdown>
-                <span className="animate-pulse">|</span>
+            <div className="flex gap-3 flex-row">
+              <div className="size-8 shrink-0 rounded-lg bg-muted flex items-center justify-center text-muted-foreground">
+                <Bot className="size-4" />
               </div>
-            </Card>
-          )}
-
-          {isLoading && !streamingContent && (
-            <div className="text-center text-muted-foreground text-sm">
-              Thinking...
+              <div className="flex flex-col max-w-[85%] gap-1 items-start">
+                {streamingMeta && (
+                  <span className="text-[10px] uppercase font-medium text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
+                    {formatPageRange(streamingMeta)}
+                  </span>
+                )}
+                <div className="px-4 py-2.5 rounded-2xl rounded-tl-sm bg-card border border-border/50 shadow-sm text-sm leading-relaxed w-full">
+                  {renderMarkdown(streamingContent, true)}
+                </div>
+              </div>
             </div>
           )}
         </div>
       </ScrollArea>
 
-      {/* Input */}
-      <form onSubmit={handleSubmit} className="p-3 border-t">
-        <div className="flex gap-2">
-          <Textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Ask about the selected pages..."
-            disabled={disabled || isLoading}
-            className="min-h-[60px] resize-none"
-            rows={2}
-          />
-          <Button
-            type="submit"
-            disabled={!input.trim() || disabled || isLoading}
-            className="self-end"
+      <div className="p-4 bg-background border-t border-border/40">
+        <div className="relative max-w-3xl mx-auto">
+          <form
+            onSubmit={handleSubmit}
+            className="relative flex items-end gap-2 rounded-2xl border border-input bg-muted/20 shadow-sm focus-within:ring-1 focus-within:ring-ring transition-all hover:bg-muted/30"
           >
-            Send
-          </Button>
+            <Textarea
+              value={input}
+              onChange={(event) => setInput(event.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Ask anything..."
+              disabled={disabled || isLoading}
+              className="resize-none min-h-[50px] max-h-[200px] border-0 focus-visible:ring-0 bg-transparent py-3.5 pl-4 pr-12 shadow-none scrollbar-hide"
+              rows={1}
+              style={{ height: input ? "auto" : "50px" }}
+              onInput={(event) => {
+                const target = event.target as HTMLTextAreaElement;
+                target.style.height = "auto";
+                target.style.height = `${target.scrollHeight}px`;
+              }}
+            />
+            <Button
+              type="submit"
+              size="icon"
+              disabled={!input.trim() || disabled || isLoading}
+              className={cn(
+                "absolute right-1.5 bottom-1.5 size-8 rounded-xl transition-all",
+                input.trim()
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "bg-transparent text-muted-foreground hover:bg-muted"
+              )}
+            >
+              <SendHorizontal className="size-4" />
+              <span className="sr-only">Send</span>
+            </Button>
+          </form>
+          <div className="text-[10px] text-center text-muted-foreground mt-2 opacity-60">
+            AI can make mistakes. Please verify important information.
+          </div>
         </div>
-      </form>
+      </div>
     </div>
   );
 }

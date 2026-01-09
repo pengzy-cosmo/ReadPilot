@@ -1,15 +1,19 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Panel, Group, Separator } from "react-resizable-panels";
+import { Toaster, toast } from "sonner";
 
 import { PdfViewer } from "@/components/PdfViewer";
 import { ChatPanel } from "@/components/ChatPanel";
 import { ApiSettings } from "@/components/ApiSettings";
 import { BookshelfModal } from "@/components/BookshelfModal";
 import { SessionListModal } from "@/components/SessionListModal";
+import { Layout } from "@/components/Layout";
+import { Header } from "@/components/Header";
+import { UploadZone } from "@/components/UploadZone";
+
 import { loadApiConfig } from "@/lib/apiConfig";
 import { useChat, type BookContext, type Message } from "@/hooks/useChat";
 import { uploadPDF, formatOutline, type PDFInfo } from "@/lib/api";
-import { Button } from "@/components/ui/button";
 import {
   appendMessages,
   buildDocKey,
@@ -116,7 +120,7 @@ function App() {
         params;
       const nextDocKey = buildDocKey(file);
       if (expectedDocKey && expectedDocKey !== nextDocKey) {
-        window.alert("Selected file does not match the expected document.");
+        toast.error("Selected file does not match the expected document.");
         return;
       }
 
@@ -193,7 +197,7 @@ function App() {
     ) => {
       const allowed = await ensureHandlePermission(handle);
       if (!allowed) {
-        window.alert("File permission denied.");
+        toast.error("File permission denied.");
         return;
       }
       const file = await handle.getFile();
@@ -260,6 +264,14 @@ function App() {
     [openDocument]
   );
 
+  // Called by UploadZone when a file is dropped or selected
+  const handleZoneSelect = useCallback(
+    (file: File) => {
+      void openDocument({ file });
+    },
+    [openDocument]
+  );
+
   // Upload file to backend when file changes
   useEffect(() => {
     if (file) {
@@ -268,13 +280,13 @@ function App() {
         .then((info) => {
           setPdfId(info.pdf_id);
           setPdfInfo(info);
-          // Use outline from backend
           if (info.outline.length > 0) {
             setOutline(formatOutline(info.outline));
           }
         })
         .catch((error) => {
           console.error("Failed to upload PDF:", error);
+          toast.error("Failed to upload PDF to server.");
           setPdfId(null);
           setPdfInfo(null);
         })
@@ -470,7 +482,10 @@ function App() {
   }, [pageRange, handleSendMessage]);
 
   return (
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
+    <Layout>
+      <Toaster position="top-center" richColors closeButton />
+
+      {/* Hidden input for openFilePicker fallback */}
       <input
         ref={fileInputRef}
         type="file"
@@ -478,78 +493,66 @@ function App() {
         className="hidden"
         onChange={handleFileInputChange}
       />
-      {/* Top Bar */}
-      <header className="h-12 border-b flex items-center justify-between px-4 bg-background shrink-0">
-        <h1 className="font-semibold">ReadPilot</h1>
-        <div className="flex items-center gap-2">
-          {isUploading && (
-            <span className="text-sm text-muted-foreground">Uploading...</span>
-          )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleOpenBookshelf}
-          >
-            Library
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowSettings(true)}
-          >
-            API Settings
-          </Button>
-        </div>
-      </header>
 
-      {/* Main Content - Resizable Panels */}
-      <Group
-        orientation="horizontal"
-        style={{ flex: 1, overflow: "hidden" }}
-        className="min-w-0"
-      >
-        {/* PDF Viewer - Left Panel */}
-        <Panel defaultSize={60} minSize={20}>
-          <PdfViewer
-            file={file}
-            onRequestOpenFile={handleRequestOpenFile}
-            pageRange={pageRange}
-            onPageRangeChange={setPageRange}
-            onCurrentPageChange={setCurrentPage}
-            initialPage={initialPage}
-            autoFollow={true}
-            contextWindow={3}
+      <Header
+        isUploading={isUploading}
+        onOpenLibrary={handleOpenBookshelf}
+        onOpenSettings={() => setShowSettings(true)}
+      />
+      {/* Spacer for fixed header */}
+      <div className="h-14 shrink-0" />
+
+      {!file ? (
+        <UploadZone onFileSelect={handleZoneSelect} isUploading={isUploading} />
+      ) : (
+        <Group
+          orientation="horizontal"
+          style={{ flex: 1, overflow: "hidden" }}
+          className="min-w-0"
+        >
+          {/* PDF Viewer - Left Panel */}
+          <Panel defaultSize={75} minSize={20} className="bg-muted/30">
+            <PdfViewer
+              file={file}
+              onRequestOpenFile={handleRequestOpenFile}
+              pageRange={pageRange}
+              onPageRangeChange={setPageRange}
+              onCurrentPageChange={setCurrentPage}
+              initialPage={initialPage}
+              autoFollow={true}
+              contextWindow={3}
+            />
+          </Panel>
+
+          {/* Resize Handle */}
+          <Separator
+            style={{
+              width: "1px",
+              background: "var(--border)",
+              cursor: "col-resize",
+            }}
+            className="shrink-0 transition-colors hover:bg-primary/50"
           />
-        </Panel>
 
-        {/* Resize Handle */}
-        <Separator
-          style={{
-            width: "6px",
-            background: "var(--border)",
-            cursor: "col-resize",
-          }}
-          className="shrink-0"
-        />
-
-        {/* Chat Panel - Right Panel */}
-        <Panel defaultSize={40} minSize="320px">
-          <ChatPanel
-            onSendMessage={handleSendMessage}
-            onSummarize={handleSummarize}
-            onNewSession={handleNewSession}
-            onClear={handleClearSession}
-            onOpenSessions={handleOpenSessionList}
-            sessionTitle={sessionTitle}
-            sessionSubtitle={sessionSubtitle}
-            messages={messages}
-            isLoading={isLoading}
-            streamingContent={streamingContent}
-            streamingMeta={streamingMeta}
-            disabled={!pdfId || isUploading}
-          />
-        </Panel>
-      </Group>
+          {/* Chat Panel - Right Panel */}
+          <Panel defaultSize={25} minSize={25} className="bg-background relative h-full flex flex-col min-h-0 min-w-0">
+            <ChatPanel
+              onSendMessage={handleSendMessage}
+              onSummarize={handleSummarize}
+              onNewSession={handleNewSession}
+              onClear={handleClearSession}
+              onOpenSessions={handleOpenSessionList}
+              sessionTitle={sessionTitle}
+              sessionSubtitle={sessionSubtitle}
+              messages={messages}
+              isLoading={isLoading}
+              streamingContent={streamingContent}
+              streamingMeta={streamingMeta}
+              disabled={!pdfId || isUploading}
+            />
+          </Panel>
+        </Group>
+      )}
 
       {/* Modals */}
       <BookshelfModal
@@ -576,7 +579,7 @@ function App() {
         config={apiConfig}
         onSave={setApiConfig}
       />
-    </div>
+    </Layout>
   );
 }
 
