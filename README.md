@@ -23,6 +23,14 @@ just dev
 docker compose up --build
 ```
 
+Open <http://localhost:5173> in your browser.
+
+Optional environment variables (set in `.env` or your shell):
+
+- `OPENAI_API_KEY`
+- `OPENAI_BASE_URL` (optional)
+- `VITE_API_URL` (optional, defaults to `http://localhost:8000`)
+
 ### Manual Setup
 
 #### Backend (Python/uv)
