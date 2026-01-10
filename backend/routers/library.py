@@ -4,15 +4,18 @@ from pathlib import Path
 
 from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import Response, StreamingResponse
+
 from models.schemas import DocumentInfo, DocumentStateUpdate
 from services.library_service import library_service
 
 router = APIRouter()
 
+# Stream PDFs in 1MB chunks to keep memory usage predictable.
 CHUNK_SIZE = 1024 * 1024
 
 
 def iter_file_range(path: Path, start: int, end: int) -> Iterator[bytes]:
+    """Yield a byte range from a file for HTTP streaming."""
     with path.open("rb") as file:
         file.seek(start)
         remaining = end - start + 1
@@ -25,11 +28,13 @@ def iter_file_range(path: Path, start: int, end: int) -> Iterator[bytes]:
 
 
 def parse_range_header(range_header: str, file_size: int) -> tuple[int, int] | None:
+    """Parse a single HTTP Range header into a valid byte range."""
     if not range_header.startswith("bytes="):
         return None
 
     range_spec = range_header.replace("bytes=", "", 1)
     if "," in range_spec:
+        # Multiple ranges are not supported.
         return None
 
     start_str, end_str = range_spec.split("-", 1)
@@ -53,6 +58,7 @@ def parse_range_header(range_header: str, file_size: int) -> tuple[int, int] | N
 
 
 def build_file_headers(doc_id: str, content_length: int) -> dict[str, str]:
+    """Build common response headers for PDF streaming."""
     return {
         "Accept-Ranges": "bytes",
         "Cache-Control": "private, max-age=31536000, immutable",
@@ -63,6 +69,7 @@ def build_file_headers(doc_id: str, content_length: int) -> dict[str, str]:
 
 @router.post("/library/import", response_model=DocumentInfo)
 async def import_document(file: UploadFile = File(...)):
+    """Import a PDF into the library and return its metadata."""
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are allowed")
 
@@ -78,11 +85,13 @@ async def import_document(file: UploadFile = File(...)):
 
 @router.get("/library", response_model=list[DocumentInfo])
 async def list_documents(limit: int = Query(20, ge=1, le=100)):
+    """List recent documents ordered by last opened time."""
     return library_service.list_documents(limit=limit)
 
 
 @router.get("/library/{doc_id}", response_model=DocumentInfo)
 async def get_document(doc_id: str):
+    """Fetch document metadata by ID."""
     doc = library_service.get_document(doc_id)
     if doc is None:
         raise HTTPException(status_code=404, detail="Document not found")
@@ -91,6 +100,7 @@ async def get_document(doc_id: str):
 
 @router.patch("/library/{doc_id}/state", response_model=DocumentInfo)
 async def update_document_state(doc_id: str, patch: DocumentStateUpdate):
+    """Persist viewer state (page, range, session) for a document."""
     updated = library_service.update_document_state(
         doc_id,
         last_page=patch.last_page,
@@ -105,6 +115,7 @@ async def update_document_state(doc_id: str, patch: DocumentStateUpdate):
 
 @router.get("/library/{doc_id}/file")
 async def get_document_file(doc_id: str, request: Request):
+    """Stream PDF file, supporting HTTP Range requests."""
     file_path = library_service.get_file_path(doc_id)
     if file_path is None:
         raise HTTPException(status_code=404, detail="Document not found")
@@ -115,6 +126,7 @@ async def get_document_file(doc_id: str, request: Request):
     if range_header:
         byte_range = parse_range_header(range_header, file_size)
         if byte_range is None:
+            # Invalid or unsupported range; respond per RFC with 416.
             return Response(
                 status_code=416,
                 headers={
@@ -134,6 +146,7 @@ async def get_document_file(doc_id: str, request: Request):
         )
 
     if request.headers.get("if-none-match") == etag:
+        # Client has a fresh cached copy.
         return Response(status_code=304, headers=build_file_headers(doc_id, 0))
 
     headers = build_file_headers(doc_id, file_size)

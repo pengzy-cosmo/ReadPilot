@@ -1,9 +1,10 @@
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
+from starlette.concurrency import run_in_threadpool
+
 from models.schemas import ChatRequest
 from services.library_service import library_service
 from services.llm import chat_with_pdf
-from starlette.concurrency import run_in_threadpool
 
 router = APIRouter()
 
@@ -15,6 +16,7 @@ async def chat(request: ChatRequest):
         if request.page_start > request.page_end:
             raise HTTPException(status_code=400, detail="page_start must be <= page_end")
 
+        # Validate doc + session ownership early to avoid unnecessary work.
         doc = library_service.get_document(request.doc_id)
         if doc is None:
             raise HTTPException(status_code=404, detail="Document not found")
@@ -25,6 +27,7 @@ async def chat(request: ChatRequest):
         if session.doc_id != request.doc_id:
             raise HTTPException(status_code=400, detail="Session does not belong to document")
 
+        # Extract only the requested page range to keep prompt size manageable.
         pdf_base64 = await library_service.extract_pages_base64(
             request.doc_id,
             request.page_start,
@@ -43,6 +46,7 @@ async def chat(request: ChatRequest):
         )
 
         async def generate():
+            # Accumulate streamed chunks to persist the full assistant reply.
             full_content = ""
             async for chunk in chat_with_pdf(
                 pdf_base64=pdf_base64,

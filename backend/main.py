@@ -2,12 +2,14 @@ import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 from routers import chat, library, sessions
 
 app = FastAPI(title="ReadPilot API")
 
 
 def load_allowed_origins() -> list[str]:
+    """Load CORS origins from env, falling back to local dev URLs."""
     raw = os.getenv("READPILOT_ALLOWED_ORIGINS", "")
     if raw:
         return [origin.strip() for origin in raw.split(",") if origin.strip()]
@@ -20,6 +22,7 @@ allow_any_origin = os.getenv("READPILOT_ALLOW_ANY_ORIGIN", "").lower() in (
     "yes",
 )
 
+# Configure CORS for the frontend and streaming headers.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"] if allow_any_origin else load_allowed_origins(),
@@ -36,4 +39,5 @@ app.include_router(sessions.router, prefix="/api")
 
 @app.get("/health")
 async def health_check():
+    """Lightweight health probe for deployments."""
     return {"status": "ok"}

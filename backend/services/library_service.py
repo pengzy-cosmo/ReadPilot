@@ -8,18 +8,21 @@ import uuid
 from pathlib import Path
 
 import pymupdf
-from models.schemas import DocumentInfo, MessageInfo, OutlineItem, SessionInfo
 from starlette.concurrency import run_in_threadpool
+
+from models.schemas import DocumentInfo, MessageInfo, OutlineItem, SessionInfo
 
 DEFAULT_RANGE_END = 7
 
 
 def now_ms() -> int:
+    """Current time in milliseconds since epoch."""
     return int(time.time() * 1000)
 
 
 class LibraryService:
     def __init__(self, data_dir: Path | None = None) -> None:
+        """Initialize storage paths and database schema."""
         base_dir = data_dir or Path(
             os.getenv(
                 "READPILOT_DATA_DIR",
@@ -33,15 +36,18 @@ class LibraryService:
         self._init_db()
 
     def _ensure_storage(self) -> None:
+        """Create storage directories if missing."""
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.library_dir.mkdir(parents=True, exist_ok=True)
 
     def _get_conn(self) -> sqlite3.Connection:
+        """Return a SQLite connection with row access by name."""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         return conn
 
     def _init_db(self) -> None:
+        """Create tables and indexes if they don't exist."""
         with self._get_conn() as conn:
             conn.executescript(
                 """
@@ -86,9 +92,11 @@ class LibraryService:
             )
 
     def _file_path(self, doc_id: str) -> Path:
+        """Map a document id to its on-disk PDF path."""
         return self.library_dir / f"{doc_id}.pdf"
 
     def _row_to_document(self, row: sqlite3.Row) -> DocumentInfo:
+        """Convert a DB row into a DocumentInfo model."""
         outline_items = json.loads(row["outline_json"]) if row["outline_json"] else []
         outline = [OutlineItem(**item) for item in outline_items]
         return DocumentInfo(
@@ -108,6 +116,7 @@ class LibraryService:
         )
 
     def _row_to_session(self, row: sqlite3.Row) -> SessionInfo:
+        """Convert a DB row into a SessionInfo model."""
         return SessionInfo(
             session_id=row["session_id"],
             doc_id=row["doc_id"],
@@ -117,6 +126,7 @@ class LibraryService:
         )
 
     def _row_to_message(self, row: sqlite3.Row) -> MessageInfo:
+        """Convert a DB row into a MessageInfo model."""
         return MessageInfo(
             message_id=row["message_id"],
             session_id=row["session_id"],
@@ -128,12 +138,14 @@ class LibraryService:
         )
 
     def get_file_path(self, doc_id: str) -> Path | None:
+        """Return the PDF path if it exists on disk."""
         path = self._file_path(doc_id)
         if not path.exists():
             return None
         return path
 
     def _import_sync(self, file_content: bytes, filename: str) -> DocumentInfo:
+        """Import a PDF and upsert metadata; runs in a threadpool."""
         doc_id = hashlib.sha256(file_content).hexdigest()
         file_path = self._file_path(doc_id)
         now = now_ms()
@@ -145,6 +157,7 @@ class LibraryService:
             existing = conn.execute("SELECT * FROM documents WHERE doc_id = ?", (doc_id,)).fetchone()
 
             if existing:
+                # Update metadata and last-opened time for existing documents.
                 conn.execute(
                     """
                     UPDATE documents
@@ -158,6 +171,7 @@ class LibraryService:
                     raise ValueError("Document not found after update")
                 return self._row_to_document(row)
 
+        # Parse PDF metadata and outline once to populate DB.
         doc = pymupdf.open(stream=file_content, filetype="pdf")
         try:
             total_pages = doc.page_count
@@ -217,9 +231,11 @@ class LibraryService:
         return record
 
     async def import_pdf(self, file_content: bytes, filename: str) -> DocumentInfo:
+        """Async wrapper for importing a PDF."""
         return await run_in_threadpool(self._import_sync, file_content, filename)
 
     def list_documents(self, limit: int = 20) -> list[DocumentInfo]:
+        """Return recent documents ordered by last opened timestamp."""
         with self._get_conn() as conn:
             rows = conn.execute(
                 "SELECT * FROM documents ORDER BY last_opened_at DESC LIMIT ?",
@@ -228,6 +244,7 @@ class LibraryService:
         return [self._row_to_document(row) for row in rows]
 
     def get_document(self, doc_id: str) -> DocumentInfo | None:
+        """Fetch a document by id."""
         with self._get_conn() as conn:
             row = conn.execute("SELECT * FROM documents WHERE doc_id = ?", (doc_id,)).fetchone()
         if row is None:
@@ -242,11 +259,13 @@ class LibraryService:
         range_end: int | None = None,
         last_session_id: str | None = None,
     ) -> DocumentInfo | None:
+        """Update last-opened state and selected range for a document."""
         with self._get_conn() as conn:
             row = conn.execute("SELECT * FROM documents WHERE doc_id = ?", (doc_id,)).fetchone()
             if row is None:
                 return None
 
+            # Apply patch semantics: keep existing values when missing.
             next_last_page = last_page if last_page is not None else row["last_page"]
             next_range_start = range_start if range_start is not None else row["range_start"]
             next_range_end = range_end if range_end is not None else row["range_end"]
@@ -276,6 +295,7 @@ class LibraryService:
         return self._row_to_document(updated)
 
     def create_session(self, doc_id: str, title: str | None = None) -> SessionInfo:
+        """Create a new session and mark it as the document's last session."""
         session_id = uuid.uuid4().hex[:16]
         now = now_ms()
         with self._get_conn() as conn:
@@ -300,6 +320,7 @@ class LibraryService:
         return self._row_to_session(row)
 
     def list_sessions(self, doc_id: str) -> list[SessionInfo]:
+        """List sessions for a document, most recently updated first."""
         with self._get_conn() as conn:
             rows = conn.execute(
                 "SELECT * FROM sessions WHERE doc_id = ? ORDER BY updated_at DESC",
@@ -308,6 +329,7 @@ class LibraryService:
         return [self._row_to_session(row) for row in rows]
 
     def get_session(self, session_id: str) -> SessionInfo | None:
+        """Fetch a session by id."""
         with self._get_conn() as conn:
             row = conn.execute("SELECT * FROM sessions WHERE session_id = ?", (session_id,)).fetchone()
         if row is None:
@@ -315,6 +337,7 @@ class LibraryService:
         return self._row_to_session(row)
 
     def update_session_title(self, session_id: str, title: str | None) -> SessionInfo | None:
+        """Update the display title of a session."""
         now = now_ms()
         with self._get_conn() as conn:
             row = conn.execute("SELECT * FROM sessions WHERE session_id = ?", (session_id,)).fetchone()
@@ -337,6 +360,7 @@ class LibraryService:
         page_start: int | None = None,
         page_end: int | None = None,
     ) -> MessageInfo:
+        """Persist a message and bump the session's updated time."""
         message_id = uuid.uuid4().hex[:16]
         now = now_ms()
         with self._get_conn() as conn:
@@ -358,6 +382,7 @@ class LibraryService:
         return self._row_to_message(row)
 
     def list_messages(self, session_id: str) -> list[MessageInfo]:
+        """List messages in ascending time order."""
         with self._get_conn() as conn:
             rows = conn.execute(
                 "SELECT * FROM messages WHERE session_id = ? ORDER BY created_at ASC",
@@ -366,6 +391,7 @@ class LibraryService:
         return [self._row_to_message(row) for row in rows]
 
     def clear_messages(self, session_id: str) -> None:
+        """Delete all messages for a session."""
         with self._get_conn() as conn:
             conn.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
             conn.execute(
@@ -374,12 +400,14 @@ class LibraryService:
             )
 
     def _extract_pages_sync(self, doc_id: str, start_page: int, end_page: int) -> bytes | None:
+        """Extract a page range into a new PDF; runs in a threadpool."""
         file_path = self._file_path(doc_id)
         if not file_path.exists():
             return None
 
         doc = pymupdf.open(file_path)
         try:
+            # Convert 1-based page numbers into PyMuPDF's 0-based indices.
             from_page = max(0, start_page - 1)
             to_page = min(doc.page_count - 1, end_page - 1)
             output = pymupdf.open()
@@ -391,12 +419,15 @@ class LibraryService:
             doc.close()
 
     async def extract_pages(self, doc_id: str, start_page: int, end_page: int) -> bytes | None:
+        """Async wrapper for extracting a page range."""
         return await run_in_threadpool(self._extract_pages_sync, doc_id, start_page, end_page)
 
     def _encode_base64(self, pdf_bytes: bytes) -> str:
+        """Base64-encode PDF bytes for OpenAI-compatible file input."""
         return base64.b64encode(pdf_bytes).decode("utf-8")
 
     async def extract_pages_base64(self, doc_id: str, start_page: int, end_page: int) -> str | None:
+        """Extract page range and return base64-encoded content."""
         pdf_bytes = await self.extract_pages(doc_id, start_page, end_page)
         if pdf_bytes is None:
             return None

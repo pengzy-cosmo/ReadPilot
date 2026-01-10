@@ -4,11 +4,15 @@ from pydantic import BaseModel, Field
 
 
 class Message(BaseModel):
+    """Chat history item for user/assistant messages."""
+
     role: str  # "user" or "assistant"
     content: str
 
 
 class BookContext(BaseModel):
+    """Optional document context injected into the system prompt."""
+
     title: str | None = None
     total_pages: int | None = None
     current_page: int | None = None
@@ -18,6 +22,8 @@ class BookContext(BaseModel):
 
 
 class ChatRequest(BaseModel):
+    """Payload for chat requests including page range and context."""
+
     doc_id: str
     session_id: str
     page_start: int = Field(..., ge=1)
@@ -36,12 +42,16 @@ class ChatRequest(BaseModel):
 
 
 class OutlineItem(BaseModel):
+    """Normalized TOC entry from PDF outline."""
+
     level: int
     title: str
     page: int
 
 
 class DocumentInfo(BaseModel):
+    """Library document metadata stored in SQLite."""
+
     doc_id: str
     filename: str
     total_pages: int
@@ -58,6 +68,8 @@ class DocumentInfo(BaseModel):
 
 
 class DocumentStateUpdate(BaseModel):
+    """Partial update for viewer state persistence."""
+
     last_page: int | None = Field(None, ge=1)
     range_start: int | None = Field(None, ge=1)
     range_end: int | None = Field(None, ge=1)
@@ -65,15 +77,21 @@ class DocumentStateUpdate(BaseModel):
 
 
 class SessionCreateRequest(BaseModel):
+    """Create a new session for a document."""
+
     doc_id: str
     title: str | None = None
 
 
 class SessionUpdateRequest(BaseModel):
+    """Patch a session title."""
+
     title: str | None = None
 
 
 class SessionInfo(BaseModel):
+    """Session metadata."""
+
     session_id: str
     doc_id: str
     title: str | None = None
@@ -82,6 +100,8 @@ class SessionInfo(BaseModel):
 
 
 class MessageInfo(BaseModel):
+    """Stored message with optional page range metadata."""
+
     message_id: str
     session_id: str
     role: str

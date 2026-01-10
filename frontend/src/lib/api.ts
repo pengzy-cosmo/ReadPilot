@@ -1,5 +1,6 @@
 import { getApiBaseUrl } from "./apiBase";
 
+// Centralized API base URL for frontend requests.
 const API_URL = getApiBaseUrl();
 
 export interface OutlineItem {
@@ -50,6 +51,7 @@ export interface MessageInfo {
 }
 
 export async function importDocument(file: File): Promise<DocumentInfo> {
+  // Use multipart/form-data to upload the PDF binary.
   const formData = new FormData();
   formData.append("file", file);
 
@@ -161,10 +163,12 @@ export async function clearMessages(sessionId: string): Promise<void> {
 }
 
 export function getDocumentFileUrl(docId: string): string {
+  // Direct file streaming endpoint used by react-pdf.
   return `${API_URL}/api/library/${docId}/file`;
 }
 
 export function formatOutline(outline: OutlineItem[]): string {
+  // Convert outline items into a simple indented markdown list.
   return outline
     .map((item) => {
       const indent = "  ".repeat(item.level - 1);

@@ -37,6 +37,7 @@ const parseErrorDetail = (raw: string) => {
 };
 
 const extractErrorMessage = (raw: string, fallback: string) => {
+  // Backends may respond with JSON detail or plain text.
   const detail = parseErrorDetail(raw).detail;
   if (detail && typeof detail === "string") {
     return detail;
@@ -54,7 +55,7 @@ export function useChat(apiConfig: ApiConfig) {
   } | null>(null);
   const messagesRef = useRef<Message[]>([]);
 
-  // Keep ref in sync with state for use in callbacks
+  // Keep ref in sync with state for use inside async callbacks.
   messagesRef.current = messages;
 
   const replaceMessages = useCallback((next: Message[]) => {
@@ -78,13 +79,14 @@ export function useChat(apiConfig: ApiConfig) {
       setStreamingContent("");
       setStreamingMeta({ pageStart, pageEnd });
 
-      // Get history from ref (excludes current message)
+      // Get history from ref (excludes current message).
       const history = messagesRef.current.map((m) => ({
         role: m.role,
         content: m.content,
       }));
 
       const requestOnce = async (targetDocId: string) => {
+        // Stream the assistant response as plain text.
         const response = await fetch(`${API_URL}/api/chat`, {
           method: "POST",
           headers: {
@@ -139,6 +141,7 @@ export function useChat(apiConfig: ApiConfig) {
 
           const chunk = decoder.decode(value, { stream: true });
           fullContent += chunk;
+          // Update UI progressively for streaming effect.
           setStreamingContent(fullContent);
         }
 

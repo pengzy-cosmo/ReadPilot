@@ -12,3 +12,15 @@ dependencies = [
     "python-multipart>=0.0.21",
     "uvicorn[standard]>=0.40.0",
 ]
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["B008", "E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

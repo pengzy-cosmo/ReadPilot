@@ -52,6 +52,7 @@ const openDB = () => {
     dbPromise = new Promise((resolve, reject) => {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
       request.onupgradeneeded = () => {
+        // Create stores and indexes on first open or version bump.
         const db = request.result;
         if (!db.objectStoreNames.contains(STORE_DOCUMENTS)) {
           const store = db.createObjectStore(STORE_DOCUMENTS, {
@@ -85,6 +86,7 @@ const runTransaction = async <T>(
   mode: IDBTransactionMode,
   fn: (tx: IDBTransaction) => Promise<T> | T
 ) => {
+  // Wrap IDB transactions to provide a Promise-based API.
   const db = await openDB();
   return new Promise<T>((resolve, reject) => {
     const tx = db.transaction(storeNames, mode);
@@ -108,6 +110,7 @@ const runTransaction = async <T>(
 };
 
 const createId = () => {
+  // Prefer crypto UUIDs when available; fallback to time-based id.
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
   }

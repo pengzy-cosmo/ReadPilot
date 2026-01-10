@@ -7,6 +7,7 @@ export type ApiConfig = {
 const STORAGE_KEY = "pdf-reader-api-config";
 
 export function loadApiConfig(): ApiConfig {
+  // Persist API settings locally to avoid re-entry on reload.
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
@@ -23,5 +24,6 @@ export function loadApiConfig(): ApiConfig {
 }
 
 export function saveApiConfig(config: ApiConfig): void {
+  // Store user-provided API settings for future sessions.
   localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
 }

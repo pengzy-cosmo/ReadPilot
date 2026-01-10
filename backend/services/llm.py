@@ -58,6 +58,7 @@ async def chat_with_pdf(
 
     effective_base_url = base_url or os.getenv("OPENAI_BASE_URL")
 
+    # Async client compatible with OpenAI chat.completions streaming.
     client = AsyncOpenAI(
         api_key=effective_api_key,
         base_url=effective_base_url,
@@ -71,21 +72,21 @@ async def chat_with_pdf(
         else:
             context_dict = book_context
 
-    # Build messages array
+    # Build messages array for the chat request.
     messages: list[dict] = []
 
-    # System message
+    # System message provides global behavior and document context.
     system_prompt = build_system_prompt(context_dict)
     messages.append({"role": "system", "content": system_prompt})
 
-    # Add conversation history (without PDF attachments for efficiency)
+    # Add conversation history (without PDF attachments for efficiency).
     if history:
         for msg in history:
             if hasattr(msg, "model_dump"):
                 msg = msg.model_dump()
             messages.append({"role": msg["role"], "content": msg["content"]})
 
-    # Current user message with PDF attachment
+    # Current user message with PDF attachment (OpenAI-compatible file input).
     messages.append(
         {
             "role": "user",

@@ -59,6 +59,7 @@ export function ChatPanel({
   const scrollViewportRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
+    // Auto-scroll the message list when new content arrives.
     if (!scrollViewportRef.current && scrollRootRef.current) {
       scrollViewportRef.current = scrollRootRef.current.querySelector(
         '[data-slot="scroll-area-viewport"]'
@@ -118,6 +119,7 @@ export function ChatPanel({
         {content}
       </ReactMarkdown>
       {showCaret && (
+        // Streaming caret for partial assistant output.
         <span className="animate-pulse inline-block w-1.5 h-3.5 bg-primary ml-0.5 align-middle" />
       )}
     </div>

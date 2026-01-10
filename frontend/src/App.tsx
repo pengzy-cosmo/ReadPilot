@@ -108,6 +108,7 @@ function App() {
     setDocId(info.doc_id);
     setDocInfo(info);
     setFileUrl(getDocumentFileUrl(info.doc_id));
+    // Pre-format outline for the chat context prompt.
     setOutline(
       info.outline.length > 0 ? formatOutline(info.outline) : undefined
     );
@@ -123,6 +124,7 @@ function App() {
 
   const ensureSessionForDoc = useCallback(
     async (info: DocumentInfo) => {
+      // Reuse the last session if available; otherwise create a new one.
       let targetSessionId = info.last_session_id;
       if (!targetSessionId) {
         const session = await createSession(info.doc_id);
@@ -201,6 +203,7 @@ function App() {
         if (cancelled) return;
         sessionRef.current = sessionId;
         const mapped = mapStoredMessages(storedMessages);
+        // Track how many messages were loaded to avoid re-deriving titles.
         messageCountRef.current = mapped.length;
         replaceMessages(mapped);
         const derivedTitle =
@@ -251,6 +254,7 @@ function App() {
 
   useEffect(() => {
     if (!docId) return;
+    // Debounce state persistence to reduce backend chatter during scrolling.
     const timer = setTimeout(() => {
       void updateDocumentState(docId, {
         last_page: currentPage,
@@ -263,6 +267,7 @@ function App() {
   }, [currentPage, docId, pageRange, sessionId]);
 
   const getBookContext = useCallback((): BookContext => {
+    // Provide document context to the LLM without extra API roundtrips.
     return {
       title: docInfo?.title || docInfo?.filename,
       totalPages: docInfo?.total_pages,

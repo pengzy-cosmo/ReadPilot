@@ -18,6 +18,7 @@ const PDFJS_VERSION =
   (pdfjs as unknown as { version?: string }).version ?? "5.4.296";
 const PDFJS_CDN_BASE = `https://unpkg.com/pdfjs-dist@${PDFJS_VERSION}/`;
 
+// Load worker + assets from CDN to avoid bundling heavy PDF.js files.
 pdfjs.GlobalWorkerOptions.workerSrc = `${PDFJS_CDN_BASE}build/pdf.worker.min.mjs`;
 
 interface PdfViewerProps {
@@ -88,6 +89,7 @@ const assignOutlineIds = (
   items: OutlineNodeInput[],
   prefix = "outline"
 ): OutlineNode[] =>
+  // Stable ids make outline rendering + caching predictable.
   items.map((item, index) => {
     const id = `${prefix}-${index}`;
     return {
@@ -104,6 +106,7 @@ const flattenOutline = (
   level = 0,
   acc: OutlineFlatItem[] = []
 ) => {
+  // Flatten tree into a list for range selection and searching.
   items.forEach((item) => {
     acc.push({
       id: item.id,
@@ -156,6 +159,7 @@ const MemoizedThumbnailItem = memo(ThumbnailItem);
 const normalizePdfFromLoad = (
   value: PDFDocumentProxy | { pdf?: PDFDocumentProxy }
 ): PDFDocumentProxy => {
+  // react-pdf may wrap the document in an object; normalize both shapes.
   if (
     value &&
     typeof value === "object" &&
@@ -258,6 +262,7 @@ export function PdfViewer({
 
   const scheduleJump = useCallback(
     (pageNumber: number, offset = 0) => {
+      // Re-try scroll to ensure the virtualized list has rendered the target.
       retryScrollRef.current.forEach((timer) => window.clearTimeout(timer));
       retryScrollRef.current = [];
       scrollToPage(pageNumber, { behavior: "auto", offset });
@@ -296,6 +301,7 @@ export function PdfViewer({
       const max = numPages || 1;
       const start = Math.max(1, Math.min(nextStart, max));
       const end = Math.max(1, Math.min(nextEnd, max));
+      // Normalize range even if inputs are flipped.
       if (start <= end) {
         onPageRangeChange({ start, end });
       } else {
@@ -362,6 +368,7 @@ export function PdfViewer({
       searchAbortRef.current.canceled = true;
       searchAbortRef.current = null;
     }
+    // Reset all search-related UI + counters.
     setIsSearching(false);
     setSearchHits([]);
     setSearchIndex(0);
@@ -394,6 +401,7 @@ export function PdfViewer({
 
   const makeTextRenderer = useCallback(
     (pageNumber: number) => {
+      // Highlight search hits by injecting <mark> tags.
       return ({ str }: { str: string }) => {
         if (!activeQuery) return escapeHtml(str);
         const escapedQuery = activeQuery.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -433,6 +441,7 @@ export function PdfViewer({
         return;
       }
       if (trimmed === activeQuery && searchHits.length > 0 && !isSearching) {
+        // If same query, just jump to the current hit.
         const nextHit = searchHits[searchIndex];
         if (nextHit) scheduleJump(nextHit.pageNumber, 0);
         return;
@@ -459,6 +468,7 @@ export function PdfViewer({
         if (token.canceled) return;
         let parts = textCacheRef.current.get(pageNumber);
         if (!parts) {
+          // Cache extracted text to speed up repeated searches.
           const page = await pdf.getPage(pageNumber);
           const textContent = await page.getTextContent();
           const rawItems = Array.isArray(textContent.items)
@@ -487,6 +497,7 @@ export function PdfViewer({
         }
         setSearchProgress({ current: pageNumber, total });
         if (pageNumber % 4 === 0) {
+          // Yield to the UI thread during long searches.
           await new Promise((resolve) => setTimeout(resolve, 0));
         }
       }
@@ -583,6 +594,7 @@ export function PdfViewer({
         return ref + 1;
       }
       if (!isRefProxyValue(ref)) return null;
+      // Resolve PDF reference to a 1-based page number.
       const pageIndex = await pdf.getPageIndex(ref);
       return pageIndex + 1;
     } catch (error) {
@@ -613,6 +625,7 @@ export function PdfViewer({
 
   const handleOutlineSelectRange = useCallback(
     async (item: OutlineNode) => {
+      // Select from current heading to the next same-or-higher level heading.
       const flat = await getOutlineFlatWithPages();
       const currentIndex = flat.findIndex((entry) => entry.id === item.id);
       if (currentIndex < 0) return;
@@ -667,6 +680,7 @@ export function PdfViewer({
 
   useEffect(() => {
     if (localAutoFollow && numPages > 0) {
+      // Keep range centered around the current page.
       const start = Math.max(1, currentPage - contextWindowSize);
       const end = Math.min(numPages, currentPage + contextWindowSize);
       onPageRangeChange({ start, end });
@@ -738,6 +752,7 @@ export function PdfViewer({
 
   useEffect(() => {
     if (!sourceUrl) {
+      // Reset viewer state when document is cleared.
       setNumPages(0);
       setCurrentPage(1);
       setPageInput("1");
@@ -763,6 +778,7 @@ export function PdfViewer({
     }
     setIsLoading(true);
     setLoadError(null);
+    // Clear viewer state before loading a new document.
     setNumPages(0);
     setCurrentPage(1);
     setPageInput("1");
@@ -793,6 +809,7 @@ export function PdfViewer({
       setIsLoading(false);
       setLoadError(null);
       const targetPage = initialPageRef.current;
+      // Respect the last-read page when opening a document.
       if (targetPage && targetPage >= 1 && targetPage <= pdf.numPages) {
         scheduleJump(targetPage, 0);
       }
@@ -846,6 +863,7 @@ export function PdfViewer({
     let cancelled = false;
     const loadBaseSize = async () => {
       try {
+        // Use the first page to compute base sizing for fit/scale.
         const page = await pdfDoc.getPage(1);
         const viewport = page.getViewport({ scale: 1 });
         const nextSize = { width: viewport.width, height: viewport.height };
@@ -868,6 +886,7 @@ export function PdfViewer({
     if (!pageBaseSize) return;
     if (hadBaseSizeRef.current) return;
     hadBaseSizeRef.current = true;
+    // If the initial page is not 1, scroll after size is known.
     if (currentPage > 1) {
       scheduleJump(currentPage, 0);
     }

@@ -13,6 +13,7 @@ export function UploadZone({ onFileSelect, isUploading }: UploadZoneProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const handleDragOver = useCallback((event: React.DragEvent) => {
+    // Prevent default to allow drop.
     event.preventDefault();
     setIsDragging(true);
   }, []);
@@ -26,6 +27,7 @@ export function UploadZone({ onFileSelect, isUploading }: UploadZoneProps) {
     (event: React.DragEvent) => {
       event.preventDefault();
       setIsDragging(false);
+      // Only accept a single PDF file.
       const file = event.dataTransfer.files?.[0];
       if (file && file.type === "application/pdf") {
         onFileSelect(file);
