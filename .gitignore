@@ -41,3 +41,6 @@ CLAUDE.md
 .claude/
 AGENTS.md
 GEMINI.md
+
+# ReadPilot storage
+backend/storage/

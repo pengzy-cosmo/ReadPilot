@@ -3,8 +3,12 @@ from .schemas import (
     BookContext,
     ChatRequest,
     OutlineItem,
-    PDFInfo,
-    PDFUploadResponse,
+    DocumentInfo,
+    DocumentStateUpdate,
+    SessionCreateRequest,
+    SessionUpdateRequest,
+    SessionInfo,
+    MessageInfo,
 )
 
 __all__ = [
@@ -12,6 +16,10 @@ __all__ = [
     "BookContext",
     "ChatRequest",
     "OutlineItem",
-    "PDFInfo",
-    "PDFUploadResponse",
+    "DocumentInfo",
+    "DocumentStateUpdate",
+    "SessionCreateRequest",
+    "SessionUpdateRequest",
+    "SessionInfo",
+    "MessageInfo",
 ]

@@ -24,10 +24,6 @@ interface ApiConfig {
   model: string;
 }
 
-interface UseChatOptions {
-  onRecoverPdfId?: () => Promise<string | null>;
-}
-
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 const parseErrorDetail = (raw: string) => {
@@ -39,13 +35,6 @@ const parseErrorDetail = (raw: string) => {
   }
 };
 
-const isPdfNotFound = (status: number, raw: string) => {
-  if (status !== 404) return false;
-  const detail = parseErrorDetail(raw).detail;
-  if (!detail) return false;
-  return detail.toLowerCase().includes("pdf not found");
-};
-
 const extractErrorMessage = (raw: string, fallback: string) => {
   const detail = parseErrorDetail(raw).detail;
   if (detail && typeof detail === "string") {
@@ -54,7 +43,7 @@ const extractErrorMessage = (raw: string, fallback: string) => {
   return fallback;
 };
 
-export function useChat(apiConfig: ApiConfig, options?: UseChatOptions) {
+export function useChat(apiConfig: ApiConfig) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
@@ -63,7 +52,6 @@ export function useChat(apiConfig: ApiConfig, options?: UseChatOptions) {
     pageEnd: number;
   } | null>(null);
   const messagesRef = useRef<Message[]>([]);
-  const onRecoverPdfId = options?.onRecoverPdfId;
 
   // Keep ref in sync with state for use in callbacks
   messagesRef.current = messages;
@@ -76,7 +64,8 @@ export function useChat(apiConfig: ApiConfig, options?: UseChatOptions) {
 
   const sendMessage = useCallback(
     async (
-      pdfId: string,
+      docId: string,
+      sessionId: string,
       pageStart: number,
       pageEnd: number,
       question: string,
@@ -94,14 +83,15 @@ export function useChat(apiConfig: ApiConfig, options?: UseChatOptions) {
         content: m.content,
       }));
 
-      const requestOnce = async (targetPdfId: string) => {
+      const requestOnce = async (targetDocId: string) => {
         const response = await fetch(`${API_URL}/api/chat`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            pdf_id: targetPdfId,
+            doc_id: targetDocId,
+            session_id: sessionId,
             page_start: pageStart,
             page_end: pageEnd,
             question,
@@ -154,10 +144,8 @@ export function useChat(apiConfig: ApiConfig, options?: UseChatOptions) {
         return fullContent;
       };
 
-      let hasRetried = false;
-
       try {
-        const fullContent = await requestOnce(pdfId);
+        const fullContent = await requestOnce(docId);
 
         setMessages((prev) => [
           ...prev,
@@ -169,48 +157,6 @@ export function useChat(apiConfig: ApiConfig, options?: UseChatOptions) {
         ]);
         setStreamingContent("");
       } catch (error) {
-        const err = error as Error & { status?: number; raw?: string };
-        const shouldRecover =
-          !hasRetried &&
-          onRecoverPdfId &&
-          isPdfNotFound(err.status ?? 0, err.raw ?? "");
-
-        if (shouldRecover) {
-          try {
-            const recoveredId = await onRecoverPdfId();
-            if (recoveredId) {
-              hasRetried = true;
-              setStreamingContent("");
-              const fullContent = await requestOnce(recoveredId);
-              setMessages((prev) => [
-                ...prev,
-                {
-                  role: "assistant",
-                  content: fullContent,
-                  meta: { pageStart, pageEnd },
-                },
-              ]);
-              setStreamingContent("");
-              return;
-            }
-          } catch (retryError) {
-            const retryMessage =
-              retryError instanceof Error
-                ? retryError.message
-                : "Unknown error";
-            setMessages((prev) => [
-              ...prev,
-              {
-                role: "assistant",
-                content: `Error: ${retryMessage}`,
-                meta: { pageStart, pageEnd },
-              },
-            ]);
-            setStreamingContent("");
-            return;
-          }
-        }
-
         const errorMessage =
           error instanceof Error ? error.message : "Unknown error";
         setMessages((prev) => [
@@ -227,7 +173,7 @@ export function useChat(apiConfig: ApiConfig, options?: UseChatOptions) {
         setStreamingMeta(null);
       }
     },
-    [apiConfig, onRecoverPdfId]
+    [apiConfig]
   );
 
   const clearMessages = useCallback(() => {

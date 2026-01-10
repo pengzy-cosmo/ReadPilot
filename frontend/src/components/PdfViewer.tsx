@@ -5,7 +5,11 @@ import type {
   PDFDocumentProxy,
   PDFPageProxy,
 } from "pdfjs-dist/types/src/display/api";
-import { EventBus, PDFLinkService, PDFViewer } from "pdfjs-dist/web/pdf_viewer.mjs";
+import {
+  EventBus,
+  PDFLinkService,
+  PDFViewer,
+} from "pdfjs-dist/web/pdf_viewer.mjs";
 
 import { Group, Panel, Separator } from "react-resizable-panels";
 
@@ -17,7 +21,7 @@ const PDFJS_CDN_BASE = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/`;
 pdfjsLib.GlobalWorkerOptions.workerSrc = `${PDFJS_CDN_BASE}build/pdf.worker.min.mjs`;
 
 interface PdfViewerProps {
-  file: File | null;
+  sourceUrl: string | null;
   onRequestOpenFile: () => void;
   pageRange: { start: number; end: number };
   onPageRangeChange: (range: { start: number; end: number }) => void;
@@ -138,8 +142,12 @@ function ThumbnailItem({
 
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
-        const transform: [number, number, number, number, number, number] | undefined =
-          outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : undefined;
+        const transform:
+          | [number, number, number, number, number, number]
+          | undefined =
+          outputScale !== 1
+            ? [outputScale, 0, 0, outputScale, 0, 0]
+            : undefined;
 
         const renderTask = page.render({
           canvasContext: ctx,
@@ -182,23 +190,26 @@ function ThumbnailItem({
     <button
       ref={wrapperRef}
       type="button"
-      className={`group w-full rounded-lg border p-2 text-left transition ${isSelected
-        ? "border-primary bg-primary/10"
-        : "border-border bg-card hover:bg-muted/60"
-        } ${isCurrent ? "ring-1 ring-primary/60" : ""}`}
+      className={`group w-full rounded-lg border p-2 text-left transition ${
+        isSelected
+          ? "border-primary bg-primary/10"
+          : "border-border bg-card hover:bg-muted/60"
+      } ${isCurrent ? "ring-1 ring-primary/60" : ""}`}
       onClick={(event) => onSelect(pageNumber, event.shiftKey)}
       title={`Select page ${pageNumber}`}
     >
       <div className="w-full flex items-center justify-center">
         <div
-          className={`w-full rounded-md bg-muted/60 ${isRendered ? "hidden" : "block"
-            }`}
+          className={`w-full rounded-md bg-muted/60 ${
+            isRendered ? "hidden" : "block"
+          }`}
           style={{ aspectRatio: "3 / 4" }}
         />
         <canvas
           ref={canvasRef}
-          className={`block rounded-md ${isRendered ? "opacity-100" : "opacity-0"
-            }`}
+          className={`block rounded-md ${
+            isRendered ? "opacity-100" : "opacity-0"
+          }`}
         />
       </div>
       <div className="mt-1 text-xs text-muted-foreground text-right">
@@ -211,7 +222,7 @@ function ThumbnailItem({
 const MemoizedThumbnailItem = memo(ThumbnailItem);
 
 export function PdfViewer({
-  file,
+  sourceUrl,
   onRequestOpenFile,
   pageRange,
   onPageRangeChange,
@@ -239,11 +250,7 @@ export function PdfViewer({
   const fitModeRef = useRef<FitMode>(fitMode);
   const [rangeInput, setRangeInput] = useState({ start: "1", end: "1" });
   const initialPageRef = useRef<number | null>(initialPage ?? null);
-  const fileKey = useMemo(() => {
-    if (!file) return "empty";
-    return `${file.name}-${file.size}-${file.lastModified}`;
-  }, [file]);
-
+  const fileKey = useMemo(() => sourceUrl ?? "empty", [sourceUrl]);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<HTMLDivElement | null>(null);
@@ -585,8 +592,9 @@ export function PdfViewer({
                 Auto
               </Button>
               <div
-                className={`flex items-center gap-2 ml-2 ${localAutoFollow ? "" : "opacity-60"
-                  }`}
+                className={`flex items-center gap-2 ml-2 ${
+                  localAutoFollow ? "" : "opacity-60"
+                }`}
               >
                 <input
                   type="range"
@@ -675,11 +683,7 @@ export function PdfViewer({
       pdfViewer.currentScaleValue = fitModeRef.current;
       setScale(pdfViewer.currentScale);
       const targetPage = initialPageRef.current;
-      if (
-        targetPage &&
-        targetPage >= 1 &&
-        targetPage <= pdfViewer.pagesCount
-      ) {
+      if (targetPage && targetPage >= 1 && targetPage <= pdfViewer.pagesCount) {
         pdfViewer.currentPageNumber = targetPage;
       }
     });
@@ -698,7 +702,7 @@ export function PdfViewer({
       linkServiceRef.current = null;
       pdfViewerRef.current = null;
     };
-  }, [file]);
+  }, [sourceUrl]);
 
   useEffect(() => {
     fitModeRef.current = fitMode;
@@ -727,7 +731,7 @@ export function PdfViewer({
 
   useEffect(() => {
     const load = async () => {
-      if (!file) {
+      if (!sourceUrl) {
         await cleanupDocument();
         const viewer = pdfViewerRef.current;
         const linkService = linkServiceRef.current;
@@ -742,9 +746,8 @@ export function PdfViewer({
       setLoadError(null);
       await cleanupDocument();
       try {
-        const buffer = await file.arrayBuffer();
         const loadingTask = pdfjsLib.getDocument({
-          data: buffer,
+          url: sourceUrl,
           wasmUrl: `${PDFJS_CDN_BASE}wasm/`,
           cMapUrl: `${PDFJS_CDN_BASE}cmaps/`,
           cMapPacked: true,
@@ -799,7 +802,7 @@ export function PdfViewer({
     return () => {
       void cleanupDocument();
     };
-  }, [cleanupDocument, file]);
+  }, [cleanupDocument, sourceUrl]);
 
   const handleOutlineClick = useCallback(async (item: OutlineNode) => {
     if (item.url) {
@@ -893,7 +896,6 @@ export function PdfViewer({
     [handleOutlineClick, handleOutlineSelectRange]
   );
 
-
   return (
     <Group orientation="horizontal" className="h-full">
       {/* Sidebar Panel */}
@@ -907,19 +909,21 @@ export function PdfViewer({
           >
             <div className="flex items-center border-b">
               <button
-                className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${sidebarTab === "outline"
-                  ? "border-b-2 border-primary text-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                  }`}
+                className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+                  sidebarTab === "outline"
+                    ? "border-b-2 border-primary text-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                }`}
                 onClick={() => setSidebarTab("outline")}
               >
                 Outline
               </button>
               <button
-                className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${sidebarTab === "thumbnails"
-                  ? "border-b-2 border-primary text-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                  }`}
+                className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+                  sidebarTab === "thumbnails"
+                    ? "border-b-2 border-primary text-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                }`}
                 onClick={() => setSidebarTab("thumbnails")}
               >
                 Thumbnails
@@ -977,7 +981,10 @@ export function PdfViewer({
       <Panel className="relative flex flex-col bg-muted/30">
         {renderToolbar}
         <div className="flex-1 relative w-full h-full overflow-hidden">
-          <div ref={containerRef} className="absolute inset-0 overflow-auto p-4 pdfViewerContainer">
+          <div
+            ref={containerRef}
+            className="absolute inset-0 overflow-auto p-4 pdfViewerContainer"
+          >
             <div className="pdfViewer" ref={viewerRef} />
             {isLoading && (
               <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm z-10">

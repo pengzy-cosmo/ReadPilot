@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from pydantic import BaseModel, Field
 
 # === Chat Models ===
@@ -20,14 +18,10 @@ class BookContext(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    # New way (recommended)
-    pdf_id: str | None = None
-    page_start: int | None = Field(None, ge=1)
-    page_end: int | None = Field(None, ge=1)
-
-    # Legacy way (backwards compatible, deprecated)
-    pdf_base64: str | None = None
-
+    doc_id: str
+    session_id: str
+    page_start: int = Field(..., ge=1)
+    page_end: int = Field(..., ge=1)
     question: str
     history: list[Message] = []
     book_context: BookContext | None = None
@@ -38,7 +32,7 @@ class ChatRequest(BaseModel):
     model: str = "gpt-5.2"
 
 
-# === PDF Models ===
+# === Library Models ===
 
 
 class OutlineItem(BaseModel):
@@ -47,20 +41,51 @@ class OutlineItem(BaseModel):
     page: int
 
 
-class PDFInfo(BaseModel):
-    pdf_id: str
+class DocumentInfo(BaseModel):
+    doc_id: str
     filename: str
     total_pages: int
     title: str | None = None
     outline: list[OutlineItem] = []
     file_size: int
-    uploaded_at: datetime
+    created_at: int
+    updated_at: int
+    last_opened_at: int
+    last_page: int
+    range_start: int
+    range_end: int
+    last_session_id: str | None = None
 
 
-class PDFUploadResponse(BaseModel):
-    pdf_id: str
-    filename: str
-    total_pages: int
+class DocumentStateUpdate(BaseModel):
+    last_page: int | None = Field(None, ge=1)
+    range_start: int | None = Field(None, ge=1)
+    range_end: int | None = Field(None, ge=1)
+    last_session_id: str | None = None
+
+
+class SessionCreateRequest(BaseModel):
+    doc_id: str
     title: str | None = None
-    outline: list[OutlineItem] = []
-    file_size: int
+
+
+class SessionUpdateRequest(BaseModel):
+    title: str | None = None
+
+
+class SessionInfo(BaseModel):
+    session_id: str
+    doc_id: str
+    title: str | None = None
+    created_at: int
+    updated_at: int
+
+
+class MessageInfo(BaseModel):
+    message_id: str
+    session_id: str
+    role: str
+    content: str
+    created_at: int
+    page_start: int | None = None
+    page_end: int | None = None

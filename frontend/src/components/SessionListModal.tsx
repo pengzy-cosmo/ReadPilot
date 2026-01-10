@@ -2,13 +2,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import type { SessionRecord } from "@/lib/readingStore";
+import type { SessionInfo } from "@/lib/api";
 import { History, X } from "lucide-react";
 
 interface SessionListModalProps {
   isOpen: boolean;
   onClose: () => void;
-  sessions: SessionRecord[];
+  sessions: SessionInfo[];
   activeSessionId: string | null;
   onOpenSession: (sessionId: string) => void;
 }
@@ -56,12 +56,12 @@ export function SessionListModal({
                 </div>
               )}
               {sessions.map((session, index) => {
-                const isActive = session.sessionId === activeSessionId;
+                const isActive = session.session_id === activeSessionId;
                 return (
                   <button
-                    key={session.sessionId}
+                    key={session.session_id}
                     type="button"
-                    onClick={() => onOpenSession(session.sessionId)}
+                    onClick={() => onOpenSession(session.session_id)}
                     className={cn(
                       "group w-full rounded-xl border px-4 py-3 text-left transition flex items-center justify-between gap-4",
                       isActive
@@ -87,10 +87,10 @@ export function SessionListModal({
                             `Session ${sessions.length - index}`}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          Updated: {formatTimestamp(session.updatedAt)}
+                          Updated: {formatTimestamp(session.updated_at)}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          Created: {formatTimestamp(session.createdAt)}
+                          Created: {formatTimestamp(session.created_at)}
                         </div>
                       </div>
                     </div>

@@ -13,76 +13,46 @@ import { UploadZone } from "@/components/UploadZone";
 
 import { loadApiConfig } from "@/lib/apiConfig";
 import { useChat, type BookContext, type Message } from "@/hooks/useChat";
-import { uploadPDF, formatOutline, type PDFInfo } from "@/lib/api";
 import {
-  appendMessages,
-  buildDocKey,
-  clearSessionMessages,
+  clearMessages,
   createSession,
+  formatOutline,
   getDocument,
-  getRecentDocuments,
+  getDocumentFileUrl,
   getSession,
+  importDocument,
+  listDocuments,
+  listMessages,
   listSessions,
-  loadMessages,
-  touchSession,
+  updateDocumentState,
   updateSessionTitle,
-  updateDocument,
-  upsertDocument,
-  type DocumentRecord,
-  type SessionRecord,
-  type StoredMessage,
-} from "@/lib/readingStore";
-
-const MAX_CACHED_FILE_BYTES = 25 * 1024 * 1024;
+  type DocumentInfo,
+  type MessageInfo,
+  type SessionInfo,
+} from "@/lib/api";
 
 function App() {
-  const [file, setFile] = useState<File | null>(null);
-  const [pdfId, setPdfId] = useState<string | null>(null);
-  const [pdfInfo, setPdfInfo] = useState<PDFInfo | null>(null);
+  const [docId, setDocId] = useState<string | null>(null);
+  const [docInfo, setDocInfo] = useState<DocumentInfo | null>(null);
+  const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [pageRange, setPageRange] = useState({ start: 1, end: 7 });
   const [currentPage, setCurrentPage] = useState(1);
   const [initialPage, setInitialPage] = useState(1);
   const [outline, setOutline] = useState<string | undefined>();
-  const [docKey, setDocKey] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [sessionTitle, setSessionTitle] = useState<string | null>(null);
   const [sessionSubtitle, setSessionSubtitle] = useState<string | null>(null);
   const [apiConfig, setApiConfig] = useState(loadApiConfig);
   const [showSettings, setShowSettings] = useState(false);
   const [showBookshelf, setShowBookshelf] = useState(false);
-  const [bookshelfDocs, setBookshelfDocs] = useState<DocumentRecord[]>([]);
+  const [bookshelfDocs, setBookshelfDocs] = useState<DocumentInfo[]>([]);
   const [showSessions, setShowSessions] = useState(false);
-  const [sessionList, setSessionList] = useState<SessionRecord[]>([]);
+  const [sessionList, setSessionList] = useState<SessionInfo[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const pendingOpenRef = useRef<{
-    expectedDocKey?: string;
-    sessionId?: string;
-    createNewSession?: boolean;
-  } | null>(null);
-  const persistedCountRef = useRef(0);
+  const messageCountRef = useRef(0);
   const sessionRef = useRef<string | null>(null);
-  const recoverPdfId = useCallback(async () => {
-    if (!file) return null;
-    setIsUploading(true);
-    try {
-      const info = await uploadPDF(file);
-      setPdfId(info.pdf_id);
-      setPdfInfo(info);
-      if (info.outline.length > 0) {
-        setOutline(formatOutline(info.outline));
-      } else {
-        setOutline(undefined);
-      }
-      return info.pdf_id;
-    } catch (error) {
-      console.error("Failed to re-upload PDF:", error);
-      toast.error("Failed to re-upload PDF to server.");
-      return null;
-    } finally {
-      setIsUploading(false);
-    }
-  }, [file]);
+
   const {
     messages,
     isLoading,
@@ -90,28 +60,31 @@ function App() {
     streamingMeta,
     sendMessage,
     replaceMessages,
-  } = useChat(apiConfig, { onRecoverPdfId: recoverPdfId });
+  } = useChat(apiConfig);
 
   const refreshRecentDocs = useCallback(async () => {
-    const docs = await getRecentDocuments(12);
+    const docs = await listDocuments(12);
     setBookshelfDocs(docs);
   }, []);
 
-  const loadSessionsForDoc = useCallback(async (nextDocKey: string | null) => {
-    if (!nextDocKey) {
+  const loadSessionsForDoc = useCallback(async (nextDocId: string | null) => {
+    if (!nextDocId) {
       setSessionList([]);
       return;
     }
-    const sessions = await listSessions(nextDocKey);
+    const sessions = await listSessions(nextDocId);
     setSessionList(sessions);
   }, []);
 
   const mapStoredMessages = useCallback(
-    (items: StoredMessage[]): Message[] =>
+    (items: MessageInfo[]): Message[] =>
       items.map((item) => ({
         role: item.role,
         content: item.content,
-        meta: item.meta,
+        meta:
+          item.page_start != null && item.page_end != null
+            ? { pageStart: item.page_start, pageEnd: item.page_end }
+            : undefined,
       })),
     []
   );
@@ -125,178 +98,78 @@ function App() {
     return trimmed.length > 60 ? `${trimmed.slice(0, 60)}…` : trimmed;
   }, []);
 
-  const formatSessionSubtitle = useCallback(
-    (session?: SessionRecord | null) => {
-      if (!session) return null;
-      const updated = new Date(session.updatedAt).toLocaleString();
-      return `Updated · ${updated}`;
-    },
-    []
-  );
+  const formatSessionSubtitle = useCallback((session?: SessionInfo | null) => {
+    if (!session) return null;
+    const updated = new Date(session.updated_at).toLocaleString();
+    return `Updated · ${updated}`;
+  }, []);
 
-  const openDocument = useCallback(
-    async (params: {
-      file: File;
-      handle?: FileSystemFileHandle | null;
-      expectedDocKey?: string;
-      sessionId?: string;
-      createNewSession?: boolean;
-    }) => {
-      const { file, handle, expectedDocKey, sessionId, createNewSession } =
-        params;
-      const nextDocKey = buildDocKey(file);
-      if (expectedDocKey && expectedDocKey !== nextDocKey) {
-        const proceed = window.confirm(
-          "Selected file does not match the expected document. Open it as a new document?"
-        );
-        if (!proceed) {
-          toast.error("Open canceled.");
-          return;
-        }
+  const applyDocumentState = useCallback((info: DocumentInfo) => {
+    setDocId(info.doc_id);
+    setDocInfo(info);
+    setFileUrl(getDocumentFileUrl(info.doc_id));
+    setOutline(
+      info.outline.length > 0 ? formatOutline(info.outline) : undefined
+    );
+    const nextRange = {
+      start: info.range_start || 1,
+      end: info.range_end || 7,
+    };
+    const nextPage = info.last_page || 1;
+    setPageRange(nextRange);
+    setCurrentPage(nextPage);
+    setInitialPage(nextPage);
+  }, []);
+
+  const ensureSessionForDoc = useCallback(
+    async (info: DocumentInfo) => {
+      let targetSessionId = info.last_session_id;
+      if (!targetSessionId) {
+        const session = await createSession(info.doc_id);
+        targetSessionId = session.session_id;
       }
-
-      const existing = await getDocument(nextDocKey);
-      const nextRange = existing?.pageRange ?? { start: 1, end: 7 };
-      const nextPage = existing?.lastPage ?? 1;
-      let targetSessionId = sessionId ?? existing?.lastSessionId;
-      if (!targetSessionId || createNewSession) {
-        const session = await createSession(nextDocKey);
-        targetSessionId = session.sessionId;
-      }
-
-      const titleFallback = file.name.replace(/\.pdf$/i, "");
-      const record: DocumentRecord = {
-        docKey: nextDocKey,
-        title: existing?.title || titleFallback,
-        fileName: file.name,
-        fileSize: file.size,
-        lastModified: file.lastModified,
-        lastOpenedAt: Date.now(),
-        lastPage: nextPage,
-        pageRange: nextRange,
-        totalPages: existing?.totalPages,
-        lastSessionId: targetSessionId,
-        fileHandle: handle ?? existing?.fileHandle ?? null,
-        fileBlob: file.size <= MAX_CACHED_FILE_BYTES ? file : null,
-      };
-
-      await upsertDocument(record);
-      setDocKey(nextDocKey);
-      setFile(file);
-      setIsUploading(true);
-      setPdfId(null);
-      setPdfInfo(null);
-      setOutline(undefined);
-      setCurrentPage(nextPage);
-      setInitialPage(nextPage);
-      setPageRange(nextRange);
       setSessionId(targetSessionId);
       setSessionTitle(null);
       setSessionSubtitle(null);
       replaceMessages([]);
-      await refreshRecentDocs();
     },
-    [refreshRecentDocs, replaceMessages]
+    [replaceMessages]
   );
 
-  const ensureHandlePermission = useCallback(
-    async (handle: FileSystemFileHandle) => {
+  const openDocumentById = useCallback(
+    async (nextDocId: string) => {
+      setIsUploading(true);
       try {
-        const options = { mode: "read" as const };
-        if (handle.queryPermission) {
-          const status = await handle.queryPermission(options);
-          if (status === "granted") return true;
-          const request = await handle.requestPermission(options);
-          return request === "granted";
-        }
-        return true;
+        const info = await getDocument(nextDocId);
+        applyDocumentState(info);
+        await ensureSessionForDoc(info);
+        await refreshRecentDocs();
       } catch (error) {
-        console.warn("Failed to request file permission:", error);
-        return false;
+        console.error("Failed to open document:", error);
+        toast.error("Failed to open document.");
+      } finally {
+        setIsUploading(false);
       }
     },
-    []
+    [applyDocumentState, ensureSessionForDoc, refreshRecentDocs]
   );
 
-  const openFromHandle = useCallback(
-    async (
-      handle: FileSystemFileHandle,
-      options?: {
-        expectedDocKey?: string;
-        sessionId?: string;
-        createNewSession?: boolean;
+  const importAndOpen = useCallback(
+    async (file: File) => {
+      setIsUploading(true);
+      try {
+        const info = await importDocument(file);
+        applyDocumentState(info);
+        await ensureSessionForDoc(info);
+        await refreshRecentDocs();
+      } catch (error) {
+        console.error("Failed to import PDF:", error);
+        toast.error("Failed to import PDF.");
+      } finally {
+        setIsUploading(false);
       }
-    ) => {
-      const allowed = await ensureHandlePermission(handle);
-      if (!allowed) {
-        toast.error("File permission denied.");
-        return;
-      }
-      const file = await handle.getFile();
-      await openDocument({
-        file,
-        handle,
-        expectedDocKey: options?.expectedDocKey,
-        sessionId: options?.sessionId,
-        createNewSession: options?.createNewSession,
-      });
     },
-    [ensureHandlePermission, openDocument]
-  );
-
-  const openFromBlob = useCallback(
-    async (
-      record: DocumentRecord,
-      options?: { sessionId?: string; createNewSession?: boolean }
-    ) => {
-      if (!record.fileBlob) return;
-      const file = new File([record.fileBlob], record.fileName, {
-        type: "application/pdf",
-        lastModified: record.lastModified,
-      });
-      await openDocument({
-        file,
-        expectedDocKey: record.docKey,
-        sessionId: options?.sessionId,
-        createNewSession: options?.createNewSession,
-      });
-    },
-    [openDocument]
-  );
-
-  const openFilePicker = useCallback(
-    async (options?: {
-      expectedDocKey?: string;
-      sessionId?: string;
-      createNewSession?: boolean;
-    }) => {
-      const picker = window.showOpenFilePicker;
-      if (picker) {
-        try {
-          const [handle] = await picker({
-            multiple: false,
-            types: [
-              {
-                description: "PDF",
-                accept: { "application/pdf": [".pdf"] },
-              },
-            ],
-          });
-          await openFromHandle(handle, options);
-          return;
-        } catch (error) {
-          const name =
-            error instanceof DOMException ? error.name : "UnknownError";
-          if (name === "AbortError") {
-            return;
-          }
-          console.warn("Failed to open file picker:", error);
-        }
-      }
-      pendingOpenRef.current = options ?? null;
-      fileInputRef.current?.click();
-    },
-    [openFromHandle]
+    [applyDocumentState, ensureSessionForDoc, refreshRecentDocs]
   );
 
   const handleFileInputChange = useCallback(
@@ -304,77 +177,43 @@ function App() {
       const selectedFile = event.target.files?.[0];
       event.target.value = "";
       if (!selectedFile) return;
-      const pending = pendingOpenRef.current;
-      pendingOpenRef.current = null;
-      await openDocument({
-        file: selectedFile,
-        expectedDocKey: pending?.expectedDocKey,
-        sessionId: pending?.sessionId,
-        createNewSession: pending?.createNewSession,
-      });
+      await importAndOpen(selectedFile);
     },
-    [openDocument]
+    [importAndOpen]
   );
 
-  // Called by UploadZone when a file is dropped or selected
   const handleZoneSelect = useCallback(
     (file: File) => {
-      void openDocument({ file });
+      void importAndOpen(file);
     },
-    [openDocument]
+    [importAndOpen]
   );
-
-  // Upload file to backend when file changes
-  useEffect(() => {
-    if (file) {
-      // Upload to backend
-      uploadPDF(file)
-        .then((info) => {
-          setPdfId(info.pdf_id);
-          setPdfInfo(info);
-          if (info.outline.length > 0) {
-            setOutline(formatOutline(info.outline));
-          }
-        })
-        .catch((error) => {
-          console.error("Failed to upload PDF:", error);
-          toast.error("Failed to upload PDF to server.");
-          setPdfId(null);
-          setPdfInfo(null);
-        })
-        .finally(() => {
-          setIsUploading(false);
-        });
-    }
-  }, [file]);
-
-  useEffect(() => {
-    if (!docKey || !pdfInfo) return;
-    void updateDocument(docKey, {
-      title: pdfInfo.title || file?.name.replace(/\.pdf$/i, "") || "Untitled",
-      totalPages: pdfInfo.total_pages,
-    });
-  }, [docKey, file, pdfInfo]);
 
   useEffect(() => {
     if (!sessionId) return;
     let cancelled = false;
     const load = async () => {
-      const [storedMessages, session] = await Promise.all([
-        loadMessages(sessionId),
-        getSession(sessionId),
-      ]);
-      if (cancelled) return;
-      const mapped = mapStoredMessages(storedMessages);
-      persistedCountRef.current = mapped.length;
-      sessionRef.current = sessionId;
-      replaceMessages(mapped);
-      const derivedTitle = session?.title ?? deriveSessionTitle(mapped) ?? null;
-      if (!session?.title && derivedTitle) {
-        void updateSessionTitle(sessionId, derivedTitle);
+      try {
+        const [storedMessages, session] = await Promise.all([
+          listMessages(sessionId),
+          getSession(sessionId),
+        ]);
+        if (cancelled) return;
+        sessionRef.current = sessionId;
+        const mapped = mapStoredMessages(storedMessages);
+        messageCountRef.current = mapped.length;
+        replaceMessages(mapped);
+        const derivedTitle =
+          session.title ?? deriveSessionTitle(mapped) ?? null;
+        if (!session.title && derivedTitle) {
+          void updateSessionTitle(sessionId, derivedTitle);
+        }
+        setSessionTitle(derivedTitle);
+        setSessionSubtitle(formatSessionSubtitle(session));
+      } catch (error) {
+        console.error("Failed to load session:", error);
+        toast.error("Failed to load session.");
       }
-      setSessionTitle(derivedTitle);
-      setSessionSubtitle(formatSessionSubtitle(session ?? null));
     };
     void load();
     return () => {
@@ -392,12 +231,11 @@ function App() {
     if (!sessionId) return;
     if (sessionRef.current !== sessionId) {
       sessionRef.current = sessionId;
-      persistedCountRef.current = 0;
+      messageCountRef.current = 0;
     }
-    if (messages.length <= persistedCountRef.current) return;
-    const pending = messages.slice(persistedCountRef.current);
-    persistedCountRef.current = messages.length;
-    void appendMessages(sessionId, pending).then(() => touchSession(sessionId));
+    if (messages.length <= messageCountRef.current) return;
+    const pending = messages.slice(messageCountRef.current);
+    messageCountRef.current = messages.length;
     const timestamp = new Date().toLocaleString();
     if (!sessionTitle) {
       const derived = deriveSessionTitle(pending);
@@ -412,31 +250,31 @@ function App() {
   }, [deriveSessionTitle, messages, sessionId, sessionTitle]);
 
   useEffect(() => {
-    if (!docKey) return;
+    if (!docId) return;
     const timer = setTimeout(() => {
-      void updateDocument(docKey, {
-        lastPage: currentPage,
-        pageRange,
-        lastSessionId: sessionId ?? undefined,
+      void updateDocumentState(docId, {
+        last_page: currentPage,
+        range_start: pageRange.start,
+        range_end: pageRange.end,
+        last_session_id: sessionId ?? null,
       });
     }, 400);
     return () => clearTimeout(timer);
-  }, [currentPage, docKey, pageRange, sessionId]);
+  }, [currentPage, docId, pageRange, sessionId]);
 
-  // Build book context
   const getBookContext = useCallback((): BookContext => {
     return {
-      title: pdfInfo?.title || file?.name.replace(".pdf", ""),
-      totalPages: pdfInfo?.total_pages,
+      title: docInfo?.title || docInfo?.filename,
+      totalPages: docInfo?.total_pages,
       currentPage,
       selectedRange: `${pageRange.start}-${pageRange.end}`,
       outline,
     };
-  }, [file, pdfInfo, currentPage, pageRange, outline]);
+  }, [docInfo, currentPage, pageRange, outline]);
 
   const handleRequestOpenFile = useCallback(() => {
-    void openFilePicker();
-  }, [openFilePicker]);
+    fileInputRef.current?.click();
+  }, []);
 
   const handleOpenBookshelf = useCallback(async () => {
     setShowBookshelf(true);
@@ -444,91 +282,79 @@ function App() {
   }, [refreshRecentDocs]);
 
   const handleOpenRecent = useCallback(
-    async (
-      nextDocKey: string,
-      options?: { sessionId?: string; createNewSession?: boolean }
-    ) => {
-      const record = await getDocument(nextDocKey);
-      if (!record) return;
-      if (record.fileHandle) {
-        await openFromHandle(record.fileHandle, {
-          expectedDocKey: nextDocKey,
-          sessionId: options?.sessionId,
-          createNewSession: options?.createNewSession,
-        });
-        return;
-      }
-      if (record.fileBlob) {
-        await openFromBlob(record, options);
-        return;
-      }
-      await openFilePicker({
-        expectedDocKey: nextDocKey,
-        sessionId: options?.sessionId,
-        createNewSession: options?.createNewSession,
-      });
+    async (nextDocId: string) => {
+      await openDocumentById(nextDocId);
     },
-    [openFilePicker, openFromBlob, openFromHandle]
+    [openDocumentById]
   );
 
   const handleNewSession = useCallback(async () => {
-    if (!docKey) return;
-    const session = await createSession(docKey);
-    setSessionId(session.sessionId);
+    if (!docId) return;
+    const session = await createSession(docId);
+    setSessionId(session.session_id);
     replaceMessages([]);
     setSessionTitle(null);
     setSessionSubtitle(null);
-    void updateDocument(docKey, { lastSessionId: session.sessionId });
     if (showSessions) {
-      void loadSessionsForDoc(docKey);
+      void loadSessionsForDoc(docId);
     }
-  }, [docKey, loadSessionsForDoc, replaceMessages, showSessions]);
+  }, [docId, loadSessionsForDoc, replaceMessages, showSessions]);
 
   const handleOpenSessionList = useCallback(() => {
-    if (!docKey) return;
+    if (!docId) return;
     setShowSessions(true);
-    void loadSessionsForDoc(docKey);
-  }, [docKey, loadSessionsForDoc]);
+    void loadSessionsForDoc(docId);
+  }, [docId, loadSessionsForDoc]);
 
   const handleOpenSession = useCallback(
     async (targetSessionId: string) => {
-      if (!docKey) return;
+      if (!docId) return;
       setShowSessions(false);
       if (targetSessionId === sessionId) return;
       setSessionId(targetSessionId);
       replaceMessages([]);
-      void updateDocument(docKey, { lastSessionId: targetSessionId });
+      void updateDocumentState(docId, { last_session_id: targetSessionId });
     },
-    [docKey, replaceMessages, sessionId]
+    [docId, replaceMessages, sessionId]
   );
 
   const handleClearSession = useCallback(async () => {
     if (!sessionId) return;
     replaceMessages([]);
-    persistedCountRef.current = 0;
-    await clearSessionMessages(sessionId);
+    messageCountRef.current = 0;
+    await clearMessages(sessionId);
     await updateSessionTitle(sessionId, null);
     setSessionTitle(null);
     setSessionSubtitle(null);
-    void touchSession(sessionId);
-    if (showSessions) {
-      void loadSessionsForDoc(docKey);
+    if (showSessions && docId) {
+      void loadSessionsForDoc(docId);
     }
-  }, [docKey, loadSessionsForDoc, replaceMessages, sessionId, showSessions]);
+  }, [docId, loadSessionsForDoc, replaceMessages, sessionId, showSessions]);
 
   const handleSendMessage = useCallback(
     async (question: string) => {
-      if (!pdfId) return;
-
+      if (!docId || !sessionId) return;
       await sendMessage(
-        pdfId,
+        docId,
+        sessionId,
         pageRange.start,
         pageRange.end,
         question,
         getBookContext()
       );
+      if (showSessions && docId) {
+        void loadSessionsForDoc(docId);
+      }
     },
-    [pdfId, pageRange, sendMessage, getBookContext]
+    [
+      docId,
+      sessionId,
+      pageRange,
+      sendMessage,
+      getBookContext,
+      showSessions,
+      loadSessionsForDoc,
+    ]
   );
 
   const handleSummarize = useCallback(() => {
@@ -540,7 +366,6 @@ function App() {
     <Layout>
       <Toaster position="top-center" richColors closeButton />
 
-      {/* Hidden input for openFilePicker fallback */}
       <input
         ref={fileInputRef}
         type="file"
@@ -554,10 +379,9 @@ function App() {
         onOpenLibrary={handleOpenBookshelf}
         onOpenSettings={() => setShowSettings(true)}
       />
-      {/* Spacer for fixed header */}
       <div className="h-14 shrink-0" />
 
-      {!file ? (
+      {!docId ? (
         <UploadZone onFileSelect={handleZoneSelect} isUploading={isUploading} />
       ) : (
         <Group
@@ -565,10 +389,9 @@ function App() {
           style={{ flex: 1, overflow: "hidden" }}
           className="min-w-0"
         >
-          {/* PDF Viewer - Left Panel */}
           <Panel defaultSize={75} minSize={20} className="bg-muted/30">
             <PdfViewer
-              file={file}
+              sourceUrl={fileUrl}
               onRequestOpenFile={handleRequestOpenFile}
               pageRange={pageRange}
               onPageRangeChange={setPageRange}
@@ -579,7 +402,6 @@ function App() {
             />
           </Panel>
 
-          {/* Resize Handle */}
           <Separator
             style={{
               width: "1px",
@@ -589,7 +411,6 @@ function App() {
             className="shrink-0 transition-colors hover:bg-primary/50"
           />
 
-          {/* Chat Panel - Right Panel */}
           <Panel
             defaultSize={25}
             minSize={25}
@@ -607,20 +428,19 @@ function App() {
               isLoading={isLoading}
               streamingContent={streamingContent}
               streamingMeta={streamingMeta}
-              disabled={!pdfId || isUploading}
+              disabled={!docId || !sessionId || isUploading}
             />
           </Panel>
         </Group>
       )}
 
-      {/* Modals */}
       <BookshelfModal
         isOpen={showBookshelf}
         onClose={() => setShowBookshelf(false)}
         documents={bookshelfDocs}
-        onOpenDocument={(nextDocKey) => {
+        onOpenDocument={(nextDocId) => {
           setShowBookshelf(false);
-          void handleOpenRecent(nextDocKey);
+          void handleOpenRecent(nextDocId);
         }}
       />
       <SessionListModal

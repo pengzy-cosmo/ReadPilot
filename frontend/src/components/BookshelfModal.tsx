@@ -2,14 +2,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import type { DocumentRecord } from "@/lib/readingStore";
+import type { DocumentInfo } from "@/lib/api";
 import { BookOpen, X } from "lucide-react";
 
 interface BookshelfModalProps {
   isOpen: boolean;
   onClose: () => void;
-  documents: DocumentRecord[];
-  onOpenDocument: (docKey: string) => void;
+  documents: DocumentInfo[];
+  onOpenDocument: (docId: string) => void;
 }
 
 const formatTimestamp = (value?: number) => {
@@ -55,9 +55,9 @@ export function BookshelfModal({
               )}
               {documents.map((doc) => (
                 <button
-                  key={doc.docKey}
+                  key={doc.doc_id}
                   type="button"
-                  onClick={() => onOpenDocument(doc.docKey)}
+                  onClick={() => onOpenDocument(doc.doc_id)}
                   className={cn(
                     "group w-full rounded-xl border border-border/50 bg-card/40 px-4 py-3 text-left transition flex items-center justify-between gap-4",
                     "hover:bg-muted/40 hover:border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -69,14 +69,14 @@ export function BookshelfModal({
                     </div>
                     <div className="min-w-0">
                       <div className="font-medium truncate">
-                        {doc.title || doc.fileName}
+                        {doc.title || doc.filename}
                       </div>
                       <div className="text-xs text-muted-foreground truncate">
-                        {doc.fileName}
+                        {doc.filename}
                       </div>
                       <div className="text-xs text-muted-foreground mt-1">
-                        Last page: {doc.lastPage} · Last opened:{" "}
-                        {formatTimestamp(doc.lastOpenedAt)}
+                        Last page: {doc.last_page} · Last opened:{" "}
+                        {formatTimestamp(doc.last_opened_at)}
                       </div>
                     </div>
                   </div>
