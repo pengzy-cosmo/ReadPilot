@@ -11,6 +11,7 @@ import { Group, Panel, Separator } from "react-resizable-panels";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Search, X } from "lucide-react";
 
 const PDFJS_VERSION =
   (pdfjs as unknown as { version?: string }).version ?? "5.4.296";
@@ -72,6 +73,7 @@ const CONTEXT_WINDOW_MAX = 12;
 const THUMBNAIL_TARGET_WIDTH = 120;
 const VIEWER_PADDING = 32;
 const PAGE_GAP = 16;
+const VIEWPORT_BUFFER_PAGES = 2;
 
 const assignOutlineIds = (
   items: OutlineNodeInput[],
@@ -186,6 +188,18 @@ export function PdfViewer({
   const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null);
   const [pageBaseSize, setPageBaseSize] = useState<PageSize | null>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeQuery, setActiveQuery] = useState("");
+  const [searchHits, setSearchHits] = useState<
+    { pageNumber: number; hitIndex: number }[]
+  >([]);
+  const [searchIndex, setSearchIndex] = useState(0);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchProgress, setSearchProgress] = useState({
+    current: 0,
+    total: 0,
+  });
   const initialPageRef = useRef<number | null>(initialPage ?? null);
   const fileKey = useMemo(() => sourceUrl ?? "empty", [sourceUrl]);
 
@@ -197,6 +211,15 @@ export function PdfViewer({
   const pdfRef = useRef<PDFDocumentProxy | null>(null);
   const hadBaseSizeRef = useRef(false);
   const retryScrollRef = useRef<number[]>([]);
+  const textCacheRef = useRef<Map<number, string[]>>(new Map());
+  const pageHitCounterRef = useRef<Map<number, number>>(new Map());
+  const searchAbortRef = useRef<{ canceled: boolean } | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const pendingHitRef = useRef<{ pageNumber: number; hitIndex: number } | null>(
+    null
+  );
+
+  const activeHit = searchHits[searchIndex];
 
   const documentOptions = useMemo<DocumentInitParameters>(
     () => ({
@@ -325,6 +348,216 @@ export function PdfViewer({
     [setContextWindowSize]
   );
 
+  const clearSearch = useCallback(() => {
+    if (searchAbortRef.current) {
+      searchAbortRef.current.canceled = true;
+      searchAbortRef.current = null;
+    }
+    setIsSearching(false);
+    setSearchHits([]);
+    setSearchIndex(0);
+    setSearchProgress({ current: 0, total: 0 });
+    setActiveQuery("");
+    pendingHitRef.current = null;
+  }, []);
+
+  const resetSearchUi = useCallback(() => {
+    clearSearch();
+    setSearchQuery("");
+    setIsSearchOpen(false);
+  }, [clearSearch]);
+
+  const escapeHtml = useCallback((value: string) => {
+    return value
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/\"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }, []);
+
+  const getNextHitIndex = useCallback((pageNumber: number) => {
+    const current = pageHitCounterRef.current.get(pageNumber) ?? 0;
+    const next = current + 1;
+    pageHitCounterRef.current.set(pageNumber, next);
+    return next;
+  }, []);
+
+  const makeTextRenderer = useCallback(
+    (pageNumber: number) => {
+      return ({ str }: { str: string }) => {
+        if (!activeQuery) return escapeHtml(str);
+        const escapedQuery = activeQuery.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const regex = new RegExp(escapedQuery, "gi");
+        const parts = str.split(regex);
+        const matches = str.match(regex);
+        if (!matches) return escapeHtml(str);
+        let result = "";
+        parts.forEach((part, index) => {
+          result += escapeHtml(part);
+          if (matches[index]) {
+            const hitIndex = getNextHitIndex(pageNumber);
+            const isActive =
+              activeHit &&
+              activeHit.pageNumber === pageNumber &&
+              activeHit.hitIndex === hitIndex;
+            const className = isActive
+              ? "pdf-search-hit pdf-search-hit--active"
+              : "pdf-search-hit";
+            result += `<mark class=\"${className}\" data-page=\"${pageNumber}\" data-hit=\"${hitIndex}\">${escapeHtml(
+              matches[index]
+            )}</mark>`;
+          }
+        });
+        return result;
+      };
+    },
+    [activeHit, activeQuery, escapeHtml, getNextHitIndex]
+  );
+
+  const runSearch = useCallback(
+    async (query: string) => {
+      const pdf = pdfRef.current;
+      const trimmed = query.trim();
+      if (!pdf || !trimmed) {
+        clearSearch();
+        return;
+      }
+      if (trimmed === activeQuery && searchHits.length > 0 && !isSearching) {
+        const nextHit = searchHits[searchIndex];
+        if (nextHit) scheduleJump(nextHit.pageNumber, 0);
+        return;
+      }
+
+      if (searchAbortRef.current) {
+        searchAbortRef.current.canceled = true;
+      }
+      const token = { canceled: false };
+      searchAbortRef.current = token;
+
+      setIsSearching(true);
+      setSearchHits([]);
+      setSearchIndex(0);
+      setActiveQuery(trimmed);
+
+      const total = pdf.numPages;
+      setSearchProgress({ current: 0, total });
+      const matches: { pageNumber: number; hitIndex: number }[] = [];
+      const escapedQuery = trimmed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const regex = new RegExp(escapedQuery, "gi");
+
+      for (let pageNumber = 1; pageNumber <= total; pageNumber += 1) {
+        if (token.canceled) return;
+        let parts = textCacheRef.current.get(pageNumber);
+        if (!parts) {
+          const page = await pdf.getPage(pageNumber);
+          const textContent = await page.getTextContent();
+          const rawItems = Array.isArray(textContent.items)
+            ? textContent.items
+            : [];
+          const strings = rawItems.map((item) =>
+            typeof (item as { str?: string }).str === "string"
+              ? (item as { str: string }).str
+              : ""
+          );
+          textCacheRef.current.set(pageNumber, strings);
+          parts = strings;
+        }
+        let pageHitCount = 0;
+        for (const part of parts) {
+          if (!part) continue;
+          regex.lastIndex = 0;
+          while (regex.exec(part) !== null) {
+            pageHitCount += 1;
+          }
+        }
+        if (pageHitCount > 0) {
+          for (let i = 1; i <= pageHitCount; i += 1) {
+            matches.push({ pageNumber, hitIndex: i });
+          }
+        }
+        setSearchProgress({ current: pageNumber, total });
+        if (pageNumber % 4 === 0) {
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        }
+      }
+
+      if (token.canceled) return;
+      setSearchHits(matches);
+      setIsSearching(false);
+      if (matches.length > 0) {
+        setSearchIndex(0);
+      }
+    },
+    [
+      activeQuery,
+      clearSearch,
+      isSearching,
+      scheduleJump,
+      searchIndex,
+      searchHits,
+    ]
+  );
+
+  const handleSearchPrev = useCallback(() => {
+    if (!searchHits.length) return;
+    const nextIndex = (searchIndex - 1 + searchHits.length) % searchHits.length;
+    setSearchIndex(nextIndex);
+  }, [searchHits, searchIndex]);
+
+  const handleSearchNext = useCallback(() => {
+    if (!searchHits.length) return;
+    const nextIndex = (searchIndex + 1) % searchHits.length;
+    setSearchIndex(nextIndex);
+  }, [searchHits, searchIndex]);
+
+  const handleSearchSubmit = useCallback(() => {
+    const trimmed = searchQuery.trim();
+    if (!trimmed) {
+      clearSearch();
+      return;
+    }
+    if (trimmed === activeQuery && searchHits.length > 0 && !isSearching) {
+      handleSearchNext();
+      return;
+    }
+    void runSearch(trimmed);
+  }, [
+    activeQuery,
+    clearSearch,
+    handleSearchNext,
+    isSearching,
+    runSearch,
+    searchHits.length,
+    searchQuery,
+  ]);
+
+  const handleToggleSearch = useCallback(() => {
+    setIsSearchOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        requestAnimationFrame(() => {
+          searchInputRef.current?.focus();
+          searchInputRef.current?.select();
+        });
+      }
+      return next;
+    });
+  }, []);
+
+  const scrollToPendingHit = useCallback(() => {
+    const pending = pendingHitRef.current;
+    if (!pending) return;
+    const container = containerRef.current;
+    if (!container) return;
+    const selector = `.pdf-search-hit[data-page=\"${pending.pageNumber}\"][data-hit=\"${pending.hitIndex}\"]`;
+    const mark = container.querySelector(selector);
+    if (mark) {
+      pendingHitRef.current = null;
+      mark.scrollIntoView({ block: "start", inline: "nearest" });
+    }
+  }, []);
+
   const resolveDestPageNumber = useCallback(async (dest: unknown) => {
     const pdf = pdfRef.current;
     if (!pdf || !dest) return null;
@@ -447,6 +680,53 @@ export function PdfViewer({
   }, [hasOutline, sidebarTab]);
 
   useEffect(() => {
+    if (!searchQuery.trim()) {
+      clearSearch();
+    }
+  }, [clearSearch, searchQuery]);
+
+  useEffect(() => {
+    if (!searchHits.length) return;
+    const target = searchHits[searchIndex];
+    if (!target) return;
+    pendingHitRef.current = target;
+    if (target.pageNumber !== currentPage) {
+      scheduleJump(target.pageNumber, 0);
+    } else {
+      scrollToPendingHit();
+    }
+  }, [scheduleJump, scrollToPendingHit, searchHits, searchIndex]);
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => scrollToPendingHit());
+    return () => cancelAnimationFrame(frame);
+  }, [
+    scrollToPendingHit,
+    currentPage,
+    activeQuery,
+    searchIndex,
+    searchHits.length,
+  ]);
+
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") {
+        event.preventDefault();
+        if (!pdfRef.current) return;
+        setIsSearchOpen(true);
+        requestAnimationFrame(() => {
+          searchInputRef.current?.focus();
+          searchInputRef.current?.select();
+        });
+      } else if (event.key === "Escape" && isSearchOpen) {
+        setIsSearchOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [isSearchOpen]);
+
+  useEffect(() => {
     if (!sourceUrl) {
       setNumPages(0);
       setCurrentPage(1);
@@ -463,6 +743,8 @@ export function PdfViewer({
       pdfRef.current = null;
       outlinePageCacheRef.current.clear();
       hadOutlineRef.current = false;
+      textCacheRef.current.clear();
+      resetSearchUi();
       if (retryScrollRef.current.length > 0) {
         retryScrollRef.current.forEach((timer) => window.clearTimeout(timer));
         retryScrollRef.current = [];
@@ -482,11 +764,13 @@ export function PdfViewer({
     setPdfDoc(null);
     setPageBaseSize(null);
     baseSizeRef.current = null;
+    textCacheRef.current.clear();
+    resetSearchUi();
     if (retryScrollRef.current.length > 0) {
       retryScrollRef.current.forEach((timer) => window.clearTimeout(timer));
       retryScrollRef.current = [];
     }
-  }, [sourceUrl]);
+  }, [resetSearchUi, sourceUrl]);
 
   const handleDocumentLoadSuccess = useCallback(
     (value: PDFDocumentProxy | { pdf?: PDFDocumentProxy }) => {
@@ -599,6 +883,10 @@ export function PdfViewer({
         retryScrollRef.current.forEach((timer) => window.clearTimeout(timer));
         retryScrollRef.current = [];
       }
+      if (searchAbortRef.current) {
+        searchAbortRef.current.canceled = true;
+        searchAbortRef.current = null;
+      }
     };
   }, []);
 
@@ -684,10 +972,10 @@ export function PdfViewer({
           typeof destType === "string"
             ? destType
             : destType &&
-                typeof destType === "object" &&
-                "name" in (destType as { name?: string })
-              ? (destType as { name?: string }).name
-              : null;
+              typeof destType === "object" &&
+              "name" in (destType as { name?: string })
+            ? (destType as { name?: string }).name
+            : null;
         if (destName) {
           const page = await pdf.getPage(pageNumber);
           const viewport = page.getViewport({ scale: effectiveScale });
@@ -761,127 +1049,197 @@ export function PdfViewer({
 
   const renderToolbar = useMemo(
     () => (
-      <div className="flex items-center gap-2 p-2 border-b bg-muted/50 flex-wrap">
-        <Button variant="outline" size="sm" onClick={onRequestOpenFile}>
-          Open PDF
-        </Button>
+      <div className="flex flex-col border-b bg-muted/50">
+        <div className="flex items-center gap-2 p-2 flex-wrap">
+          <Button variant="outline" size="sm" onClick={onRequestOpenFile}>
+            Open PDF
+          </Button>
 
-        {numPages > 0 && (
-          <>
-            {!showSidebar && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setShowSidebar(true);
-                }}
-              >
-                Sidebar
-              </Button>
-            )}
+          {numPages > 0 && (
+            <>
+              {!showSidebar && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setShowSidebar(true);
+                  }}
+                >
+                  Sidebar
+                </Button>
+              )}
 
-            <div className="flex items-center gap-1 ml-2">
-              <Input
-                type="number"
-                min={1}
-                max={numPages}
-                value={pageInput}
-                onChange={(e) => setPageInput(e.target.value)}
-                onBlur={handlePageInputCommit}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    handlePageInputCommit();
-                  }
-                }}
-                className="w-16 h-8"
-              />
-              <span className="text-sm text-muted-foreground">
-                / {numPages}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-1 ml-2">
-              <Button variant="outline" size="sm" onClick={handleZoomIn}>
-                +
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleZoomOut}>
-                -
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleToggleFit}>
-                {fitMode === "page-width" ? "Fit" : "Width"}
-              </Button>
-              <span className="text-xs text-muted-foreground">
-                {Math.round(effectiveScale * 100)}%
-              </span>
-            </div>
-
-            <div className="flex items-center gap-1 ml-2 border-l pl-2 shrink-0">
-              <span className="text-sm text-muted-foreground">Range:</span>
-              <Input
-                type="number"
-                min={1}
-                max={numPages}
-                value={rangeInput.start}
-                onChange={(e) => handleRangeStartChange(e.target.value)}
-                onBlur={commitRangeStart}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    commitRangeStart();
-                  }
-                }}
-                disabled={localAutoFollow}
-                className="w-20 h-8"
-              />
-              <span>-</span>
-              <Input
-                type="number"
-                min={1}
-                max={numPages}
-                value={rangeInput.end}
-                onChange={(e) => handleRangeEndChange(e.target.value)}
-                onBlur={commitRangeEnd}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    commitRangeEnd();
-                  }
-                }}
-                disabled={localAutoFollow}
-                className="w-20 h-8"
-              />
-              <Button
-                variant={localAutoFollow ? "default" : "outline"}
-                size="sm"
-                onClick={() => setLocalAutoFollow(!localAutoFollow)}
-                title={`Auto-follow: current page ±${contextWindowSize}`}
-              >
-                Auto
-              </Button>
-              <div
-                className={`flex items-center gap-2 ml-2 ${
-                  localAutoFollow ? "" : "opacity-60"
-                }`}
-              >
-                <input
-                  type="range"
-                  min={CONTEXT_WINDOW_MIN}
-                  max={CONTEXT_WINDOW_MAX}
-                  value={contextWindowSize}
-                  onChange={(event) =>
-                    handleContextWindowChange(parseInt(event.target.value, 10))
-                  }
-                  disabled={!localAutoFollow}
-                  className="w-24"
-                  aria-label="Auto-follow window size"
+              <div className="flex items-center gap-1 ml-2">
+                <Input
+                  type="number"
+                  min={1}
+                  max={numPages}
+                  value={pageInput}
+                  onChange={(e) => setPageInput(e.target.value)}
+                  onBlur={handlePageInputCommit}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handlePageInputCommit();
+                    }
+                  }}
+                  className="w-16 h-8"
                 />
-                <span className="text-xs text-muted-foreground">
-                  ±{contextWindowSize}
+                <span className="text-sm text-muted-foreground">
+                  / {numPages}
                 </span>
               </div>
-            </div>
-          </>
+
+              <div className="flex items-center gap-1 ml-2">
+                <Button variant="outline" size="sm" onClick={handleZoomIn}>
+                  +
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleZoomOut}>
+                  -
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleToggleFit}>
+                  {fitMode === "page-width" ? "Fit" : "Width"}
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  {Math.round(effectiveScale * 100)}%
+                </span>
+              </div>
+
+              <div className="flex items-center gap-1 ml-2 border-l pl-2 shrink-0">
+                <span className="text-sm text-muted-foreground">Range:</span>
+                <Input
+                  type="number"
+                  min={1}
+                  max={numPages}
+                  value={rangeInput.start}
+                  onChange={(e) => handleRangeStartChange(e.target.value)}
+                  onBlur={commitRangeStart}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      commitRangeStart();
+                    }
+                  }}
+                  disabled={localAutoFollow}
+                  className="w-20 h-8"
+                />
+                <span>-</span>
+                <Input
+                  type="number"
+                  min={1}
+                  max={numPages}
+                  value={rangeInput.end}
+                  onChange={(e) => handleRangeEndChange(e.target.value)}
+                  onBlur={commitRangeEnd}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      commitRangeEnd();
+                    }
+                  }}
+                  disabled={localAutoFollow}
+                  className="w-20 h-8"
+                />
+                <Button
+                  variant={localAutoFollow ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setLocalAutoFollow(!localAutoFollow)}
+                  title={`Auto-follow: current page ±${contextWindowSize}`}
+                >
+                  Auto
+                </Button>
+                <div
+                  className={`flex items-center gap-2 ml-2 ${
+                    localAutoFollow ? "" : "opacity-60"
+                  }`}
+                >
+                  <input
+                    type="range"
+                    min={CONTEXT_WINDOW_MIN}
+                    max={CONTEXT_WINDOW_MAX}
+                    value={contextWindowSize}
+                    onChange={(event) =>
+                      handleContextWindowChange(
+                        parseInt(event.target.value, 10)
+                      )
+                    }
+                    disabled={!localAutoFollow}
+                    className="w-24"
+                    aria-label="Auto-follow window size"
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    ±{contextWindowSize}
+                  </span>
+                </div>
+              </div>
+
+              <Button
+                variant={isSearchOpen ? "default" : "outline"}
+                size="sm"
+                className="ml-auto"
+                onClick={handleToggleSearch}
+                title="Search (Ctrl+F)"
+              >
+                {isSearchOpen ? (
+                  <X className="h-4 w-4" />
+                ) : (
+                  <Search className="h-4 w-4" />
+                )}
+              </Button>
+            </>
+          )}
+        </div>
+
+        {isSearchOpen && (
+          <div className="flex items-center gap-2 px-2 py-1 border-t bg-muted/40">
+            <Input
+              ref={searchInputRef}
+              type="search"
+              placeholder="Search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  if (e.shiftKey) {
+                    handleSearchPrev();
+                  } else {
+                    handleSearchSubmit();
+                  }
+                } else if (e.key === "Escape") {
+                  setIsSearchOpen(false);
+                }
+              }}
+              className="w-56 h-8"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSearchPrev}
+              disabled={isSearching || searchHits.length === 0}
+              title="Previous match"
+            >
+              Prev
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSearchNext}
+              disabled={isSearching || searchHits.length === 0}
+              title="Next match"
+            >
+              Next
+            </Button>
+            {isSearching ? (
+              <span className="text-xs text-muted-foreground">
+                {searchProgress.current}/{searchProgress.total}
+              </span>
+            ) : searchHits.length > 0 ? (
+              <span className="text-xs text-muted-foreground">
+                {searchIndex + 1}/{searchHits.length}
+              </span>
+            ) : null}
+          </div>
         )}
       </div>
     ),
@@ -905,6 +1263,17 @@ export function PdfViewer({
       rangeInput.start,
       showSidebar,
       effectiveScale,
+      handleToggleSearch,
+      handleSearchNext,
+      handleSearchPrev,
+      handleSearchSubmit,
+      isSearching,
+      isSearchOpen,
+      searchIndex,
+      searchProgress.current,
+      searchProgress.total,
+      searchQuery,
+      searchHits.length,
     ]
   );
 
@@ -972,7 +1341,9 @@ export function PdfViewer({
                         key={`${fileKey}-${page}`}
                         pageNumber={page}
                         pdf={pdfDoc}
-                        isSelected={page >= pageRange.start && page <= pageRange.end}
+                        isSelected={
+                          page >= pageRange.start && page <= pageRange.end
+                        }
                         isCurrent={currentPage === page}
                         onSelect={handleThumbnailSelect}
                       />
@@ -1018,40 +1389,62 @@ export function PdfViewer({
                     ref={viewerRef}
                     style={{ height: "100%", width: "100%" }}
                     totalCount={numPages}
-                    initialTopMostItemIndex={Math.max(0, (initialPage ?? 1) - 1)}
-                    rangeChanged={handleRangeChanged}
-                    itemContent={(index) => (
-                      <div
-                        className="pdf-page-wrapper"
-                        style={
-                          pageRenderSize
-                            ? { height: pageRenderSize.height + PAGE_GAP }
-                            : undefined
-                        }
-                      >
-                        <div className="pdf-page">
-                          <Page
-                            pageNumber={index + 1}
-                            scale={effectiveScale}
-                            renderTextLayer
-                            renderAnnotationLayer
-                            onLoadSuccess={handlePageLoadSuccess}
-                            devicePixelRatio={
-                              typeof window !== "undefined"
-                                ? window.devicePixelRatio || 1
-                                : 1
-                            }
-                            loading={
-                              <div
-                                className="h-48 w-full rounded-lg bg-muted/40 animate-pulse"
-                                aria-label="Loading page"
-                              />
-                            }
-                          />
-                        </div>
-                        <div style={{ height: PAGE_GAP }} />
-                      </div>
+                    initialTopMostItemIndex={Math.max(
+                      0,
+                      (initialPage ?? 1) - 1
                     )}
+                    rangeChanged={handleRangeChanged}
+                    defaultItemHeight={
+                      pageRenderSize ? pageRenderSize.height + PAGE_GAP : 800
+                    }
+                    increaseViewportBy={
+                      pageRenderSize
+                        ? pageRenderSize.height * VIEWPORT_BUFFER_PAGES
+                        : 1600
+                    }
+                    itemContent={(index) => {
+                      const pageNumber = index + 1;
+                      if (activeQuery) {
+                        pageHitCounterRef.current.set(pageNumber, 0);
+                      }
+                      return (
+                        <div
+                          className="pdf-page-wrapper"
+                          style={
+                            pageRenderSize
+                              ? { height: pageRenderSize.height + PAGE_GAP }
+                              : undefined
+                          }
+                        >
+                          <div className="pdf-page">
+                            <Page
+                              pageNumber={pageNumber}
+                              scale={effectiveScale}
+                              renderTextLayer
+                              renderAnnotationLayer
+                              onLoadSuccess={handlePageLoadSuccess}
+                              customTextRenderer={
+                                activeQuery
+                                  ? makeTextRenderer(pageNumber)
+                                  : undefined
+                              }
+                              devicePixelRatio={
+                                typeof window !== "undefined"
+                                  ? window.devicePixelRatio || 1
+                                  : 1
+                              }
+                              loading={
+                                <div
+                                  className="h-48 w-full rounded-lg bg-muted/40 animate-pulse"
+                                  aria-label="Loading page"
+                                />
+                              }
+                            />
+                          </div>
+                          <div style={{ height: PAGE_GAP }} />
+                        </div>
+                      );
+                    }}
                   />
                 </Document>
               </div>

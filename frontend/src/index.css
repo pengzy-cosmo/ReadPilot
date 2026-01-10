@@ -159,7 +159,7 @@
 /* Keep text layer selectable but visually hidden to avoid double text */
 .textLayer :is(span, br) {
   color: transparent !important;
-  -webkit-text-fill-color: transparent;
+  -webkit-text-fill-color: transparent !important;
   text-shadow: none !important;
 }
 
@@ -170,6 +170,21 @@
 
 .textLayer ::-moz-selection {
   color: transparent;
+}
+
+.textLayer mark.pdf-search-hit {
+  background: #fef3c7;
+  color: #111 !important;
+  -webkit-text-fill-color: #111 !important;
+  padding: 0 1px;
+  border-radius: 2px;
+}
+
+.textLayer mark.pdf-search-hit--active {
+  background: #fb7185;
+  color: #111 !important;
+  -webkit-text-fill-color: #111 !important;
+  box-shadow: 0 0 0 1px rgba(190, 18, 60, 0.4);
 }
 
 /* Modern Scrollbar */
