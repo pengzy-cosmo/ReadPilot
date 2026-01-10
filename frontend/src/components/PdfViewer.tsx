@@ -1,24 +1,22 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import * as pdfjsLib from "pdfjs-dist";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Document, Page, Thumbnail, pdfjs } from "react-pdf";
 import type {
-  PDFDocumentLoadingTask,
+  DocumentInitParameters,
   PDFDocumentProxy,
   PDFPageProxy,
 } from "pdfjs-dist/types/src/display/api";
-import {
-  EventBus,
-  PDFLinkService,
-  PDFViewer,
-} from "pdfjs-dist/web/pdf_viewer.mjs";
+import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 
 import { Group, Panel, Separator } from "react-resizable-panels";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { memo } from "react";
 
-const PDFJS_CDN_BASE = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/`;
-pdfjsLib.GlobalWorkerOptions.workerSrc = `${PDFJS_CDN_BASE}build/pdf.worker.min.mjs`;
+const PDFJS_VERSION =
+  (pdfjs as unknown as { version?: string }).version ?? "5.4.296";
+const PDFJS_CDN_BASE = `https://unpkg.com/pdfjs-dist@${PDFJS_VERSION}/`;
+
+pdfjs.GlobalWorkerOptions.workerSrc = `${PDFJS_CDN_BASE}build/pdf.worker.min.mjs`;
 
 interface PdfViewerProps {
   sourceUrl: string | null;
@@ -59,18 +57,21 @@ type FitMode = "page-width" | "page-fit";
 type ThumbnailItemProps = {
   pageNumber: number;
   pdf: PDFDocumentProxy | null;
-  rootRef: { current: HTMLDivElement | null };
   isSelected: boolean;
   isCurrent: boolean;
   onSelect: (pageNumber: number, isRange: boolean) => void;
 };
 
-const ANNOTATION_MODE = 2; // ENABLE
-const TEXT_LAYER_MODE = 1; // ENABLE
+type PageSize = {
+  width: number;
+  height: number;
+};
 
 const CONTEXT_WINDOW_MIN = 1;
 const CONTEXT_WINDOW_MAX = 12;
 const THUMBNAIL_TARGET_WIDTH = 120;
+const VIEWER_PADDING = 32;
+const PAGE_GAP = 16;
 
 const assignOutlineIds = (
   items: OutlineNodeInput[],
@@ -110,85 +111,12 @@ const flattenOutline = (
 function ThumbnailItem({
   pageNumber,
   pdf,
-  rootRef,
   isSelected,
   isCurrent,
   onSelect,
 }: ThumbnailItemProps) {
-  const wrapperRef = useRef<HTMLButtonElement | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const renderTaskRef = useRef<ReturnType<PDFPageProxy["render"]> | null>(null);
-  const [isRendered, setIsRendered] = useState(false);
-
-  useEffect(() => {
-    const target = wrapperRef.current;
-    const canvas = canvasRef.current;
-    if (!target || !canvas || !pdf || isRendered) return;
-
-    let cancelled = false;
-    const root = rootRef.current;
-
-    const renderThumbnail = async () => {
-      try {
-        const page = await pdf.getPage(pageNumber);
-        const baseViewport = page.getViewport({ scale: 1 });
-        const scale = THUMBNAIL_TARGET_WIDTH / baseViewport.width;
-        const viewport = page.getViewport({ scale });
-        const outputScale = window.devicePixelRatio || 1;
-        canvas.width = Math.floor(viewport.width * outputScale);
-        canvas.height = Math.floor(viewport.height * outputScale);
-        canvas.style.width = `${Math.floor(viewport.width)}px`;
-        canvas.style.height = `${Math.floor(viewport.height)}px`;
-
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-        const transform:
-          | [number, number, number, number, number, number]
-          | undefined =
-          outputScale !== 1
-            ? [outputScale, 0, 0, outputScale, 0, 0]
-            : undefined;
-
-        const renderTask = page.render({
-          canvasContext: ctx,
-          viewport,
-          transform,
-        });
-
-        renderTaskRef.current = renderTask;
-        await renderTask.promise;
-
-        if (!cancelled) {
-          setIsRendered(true);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          console.warn("Failed to render thumbnail:", error);
-        }
-      }
-    };
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) {
-          observer.disconnect();
-          void renderThumbnail();
-        }
-      },
-      { root, rootMargin: "200px" }
-    );
-
-    observer.observe(target);
-    return () => {
-      cancelled = true;
-      observer.disconnect();
-      renderTaskRef.current?.cancel?.();
-    };
-  }, [pageNumber, pdf, rootRef, isRendered]);
-
   return (
     <button
-      ref={wrapperRef}
       type="button"
       className={`group w-full rounded-lg border p-2 text-left transition ${
         isSelected
@@ -199,17 +127,10 @@ function ThumbnailItem({
       title={`Select page ${pageNumber}`}
     >
       <div className="w-full flex items-center justify-center">
-        <div
-          className={`w-full rounded-md bg-muted/60 ${
-            isRendered ? "hidden" : "block"
-          }`}
-          style={{ aspectRatio: "3 / 4" }}
-        />
-        <canvas
-          ref={canvasRef}
-          className={`block rounded-md ${
-            isRendered ? "opacity-100" : "opacity-0"
-          }`}
+        <Thumbnail
+          pageNumber={pageNumber}
+          pdf={pdf ?? undefined}
+          width={THUMBNAIL_TARGET_WIDTH}
         />
       </div>
       <div className="mt-1 text-xs text-muted-foreground text-right">
@@ -220,6 +141,20 @@ function ThumbnailItem({
 }
 
 const MemoizedThumbnailItem = memo(ThumbnailItem);
+
+const normalizePdfFromLoad = (
+  value: PDFDocumentProxy | { pdf?: PDFDocumentProxy }
+): PDFDocumentProxy => {
+  if (
+    value &&
+    typeof value === "object" &&
+    "pdf" in value &&
+    (value as { pdf?: PDFDocumentProxy }).pdf
+  ) {
+    return (value as { pdf: PDFDocumentProxy }).pdf;
+  }
+  return value as PDFDocumentProxy;
+};
 
 export function PdfViewer({
   sourceUrl,
@@ -243,32 +178,70 @@ export function PdfViewer({
   );
   const [outlineItems, setOutlineItems] = useState<OutlineNode[]>([]);
   const [fitMode, setFitMode] = useState<FitMode>("page-width");
-  const [scale, setScale] = useState(1);
+  const [userScale, setUserScale] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [thumbnailAnchor, setThumbnailAnchor] = useState<number | null>(null);
-  const fitModeRef = useRef<FitMode>(fitMode);
   const [rangeInput, setRangeInput] = useState({ start: "1", end: "1" });
+  const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null);
+  const [pageBaseSize, setPageBaseSize] = useState<PageSize | null>(null);
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const initialPageRef = useRef<number | null>(initialPage ?? null);
   const fileKey = useMemo(() => sourceUrl ?? "empty", [sourceUrl]);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const viewerRef = useRef<HTMLDivElement | null>(null);
-  const thumbnailRootRef = useRef<HTMLDivElement | null>(null);
-  const eventBusRef = useRef<EventBus | null>(null);
-  const linkServiceRef = useRef<PDFLinkService | null>(null);
-  const pdfViewerRef = useRef<PDFViewer | null>(null);
-  const loadingTaskRef = useRef<PDFDocumentLoadingTask | null>(null);
-  const pdfRef = useRef<PDFDocumentProxy | null>(null);
+  const viewerRef = useRef<VirtuosoHandle | null>(null);
   const outlinePageCacheRef = useRef<Map<string, number>>(new Map());
   const hadOutlineRef = useRef(false);
+  const baseSizeRef = useRef<PageSize | null>(null);
+  const pdfRef = useRef<PDFDocumentProxy | null>(null);
+  const hadBaseSizeRef = useRef(false);
+  const retryScrollRef = useRef<number[]>([]);
 
-  const scrollToPage = useCallback((pageNumber: number) => {
-    const viewer = pdfViewerRef.current;
-    if (viewer) {
-      viewer.currentPageNumber = pageNumber;
-    }
-  }, []);
+  const documentOptions = useMemo<DocumentInitParameters>(
+    () => ({
+      cMapUrl: `${PDFJS_CDN_BASE}cmaps/`,
+      cMapPacked: true,
+      standardFontDataUrl: `${PDFJS_CDN_BASE}standard_fonts/`,
+      wasmUrl: `${PDFJS_CDN_BASE}wasm/`,
+      iccUrl: `${PDFJS_CDN_BASE}iccs/`,
+    }),
+    []
+  );
+
+  const scrollToPage = useCallback(
+    (
+      pageNumber: number,
+      options?: { behavior?: ScrollBehavior; offset?: number }
+    ) => {
+      viewerRef.current?.scrollToIndex({
+        index: pageNumber - 1,
+        align: "start",
+        behavior: options?.behavior ?? "smooth",
+        offset: options?.offset ?? 0,
+      });
+    },
+    []
+  );
+
+  const scheduleJump = useCallback(
+    (pageNumber: number, offset = 0) => {
+      retryScrollRef.current.forEach((timer) => window.clearTimeout(timer));
+      retryScrollRef.current = [];
+      scrollToPage(pageNumber, { behavior: "auto", offset });
+      retryScrollRef.current.push(
+        window.setTimeout(() => {
+          scrollToPage(pageNumber, { behavior: "auto", offset });
+        }, 120)
+      );
+      retryScrollRef.current.push(
+        window.setTimeout(() => {
+          scrollToPage(pageNumber, { behavior: "auto", offset });
+        }, 420)
+      );
+    },
+    [scrollToPage]
+  );
 
   const handlePageInputCommit = useCallback(() => {
     if (!numPages) return;
@@ -319,29 +292,17 @@ export function PdfViewer({
   }, [clampRange, pageRange.end, pageRange.start, rangeInput.end]);
 
   const handleZoomIn = useCallback(() => {
-    const viewer = pdfViewerRef.current;
-    if (!viewer) return;
-    const next = Math.min(viewer.currentScale + 0.1, 3);
-    viewer.currentScale = next;
-    setScale(next);
+    setUserScale((prev) => Math.min(prev + 0.1, 3));
   }, []);
 
   const handleZoomOut = useCallback(() => {
-    const viewer = pdfViewerRef.current;
-    if (!viewer) return;
-    const next = Math.max(viewer.currentScale - 0.1, 0.5);
-    viewer.currentScale = next;
-    setScale(next);
+    setUserScale((prev) => Math.max(prev - 0.1, 0.5));
   }, []);
 
   const handleToggleFit = useCallback(() => {
-    const nextMode = fitMode === "page-width" ? "page-fit" : "page-width";
-    setFitMode(nextMode);
-    const viewer = pdfViewerRef.current;
-    if (viewer) {
-      viewer.currentScaleValue = nextMode;
-    }
-  }, [fitMode]);
+    setFitMode((prev) => (prev === "page-width" ? "page-fit" : "page-width"));
+    setUserScale(1);
+  }, []);
 
   const handleRangeStartChange = useCallback((value: string) => {
     setLocalAutoFollow(false);
@@ -427,9 +388,9 @@ export function PdfViewer({
       setLocalAutoFollow(false);
       onPageRangeChange({ start, end });
       setThumbnailAnchor(start);
-      scrollToPage(start);
+      scheduleJump(start, 0);
     },
-    [getOutlineFlatWithPages, numPages, onPageRangeChange, scrollToPage]
+    [getOutlineFlatWithPages, numPages, onPageRangeChange, scheduleJump]
   );
 
   const handleThumbnailSelect = useCallback(
@@ -444,15 +405,9 @@ export function PdfViewer({
         onPageRangeChange({ start: pageNumber, end: pageNumber });
         setThumbnailAnchor(pageNumber);
       }
-      scrollToPage(pageNumber);
+      scheduleJump(pageNumber, 0);
     },
-    [
-      numPages,
-      onPageRangeChange,
-      scrollToPage,
-      thumbnailAnchor,
-      setThumbnailAnchor,
-    ]
+    [numPages, onPageRangeChange, scheduleJump, thumbnailAnchor]
   );
 
   useEffect(() => {
@@ -490,6 +445,319 @@ export function PdfViewer({
       setSidebarTab("thumbnails");
     }
   }, [hasOutline, sidebarTab]);
+
+  useEffect(() => {
+    if (!sourceUrl) {
+      setNumPages(0);
+      setCurrentPage(1);
+      setPageInput("1");
+      setOutlineItems([]);
+      setHasOutline(false);
+      setThumbnailAnchor(null);
+      setLoadError(null);
+      setIsLoading(false);
+      setPdfDoc(null);
+      setPageBaseSize(null);
+      hadBaseSizeRef.current = false;
+      baseSizeRef.current = null;
+      pdfRef.current = null;
+      outlinePageCacheRef.current.clear();
+      hadOutlineRef.current = false;
+      if (retryScrollRef.current.length > 0) {
+        retryScrollRef.current.forEach((timer) => window.clearTimeout(timer));
+        retryScrollRef.current = [];
+      }
+      return;
+    }
+    setIsLoading(true);
+    setLoadError(null);
+    setNumPages(0);
+    setCurrentPage(1);
+    setPageInput("1");
+    setOutlineItems([]);
+    setHasOutline(false);
+    outlinePageCacheRef.current.clear();
+    hadOutlineRef.current = false;
+    hadBaseSizeRef.current = false;
+    setPdfDoc(null);
+    setPageBaseSize(null);
+    baseSizeRef.current = null;
+    if (retryScrollRef.current.length > 0) {
+      retryScrollRef.current.forEach((timer) => window.clearTimeout(timer));
+      retryScrollRef.current = [];
+    }
+  }, [sourceUrl]);
+
+  const handleDocumentLoadSuccess = useCallback(
+    (value: PDFDocumentProxy | { pdf?: PDFDocumentProxy }) => {
+      const pdf = normalizePdfFromLoad(value);
+      pdfRef.current = pdf;
+      setPdfDoc(pdf);
+      setNumPages(pdf.numPages);
+      setCurrentPage(1);
+      setPageInput("1");
+      setIsLoading(false);
+      setLoadError(null);
+      const targetPage = initialPageRef.current;
+      if (targetPage && targetPage >= 1 && targetPage <= pdf.numPages) {
+        scheduleJump(targetPage, 0);
+      }
+    },
+    [scheduleJump]
+  );
+
+  const handleDocumentLoadError = useCallback((error: Error) => {
+    console.error("Failed to load PDF:", error);
+    setLoadError("Failed to load PDF. Please try another file.");
+    setIsLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (!pdfDoc) return;
+    let cancelled = false;
+    const loadOutline = async () => {
+      try {
+        const outline = await pdfDoc.getOutline();
+        if (cancelled) return;
+        const normalized = assignOutlineIds(
+          (outline ?? []) as OutlineNodeInput[]
+        );
+        setOutlineItems(normalized);
+        setHasOutline(normalized.length > 0);
+        if (normalized.length > 0 && !hadOutlineRef.current) {
+          setSidebarTab("outline");
+          hadOutlineRef.current = true;
+        }
+        if (normalized.length === 0) {
+          hadOutlineRef.current = false;
+        }
+        outlinePageCacheRef.current.clear();
+      } catch (error) {
+        if (cancelled) return;
+        console.warn("Failed to load outline:", error);
+        setOutlineItems([]);
+        setHasOutline(false);
+        hadOutlineRef.current = false;
+        outlinePageCacheRef.current.clear();
+      }
+    };
+    void loadOutline();
+    return () => {
+      cancelled = true;
+    };
+  }, [pdfDoc]);
+
+  useEffect(() => {
+    if (!pdfDoc) return;
+    let cancelled = false;
+    const loadBaseSize = async () => {
+      try {
+        const page = await pdfDoc.getPage(1);
+        const viewport = page.getViewport({ scale: 1 });
+        const nextSize = { width: viewport.width, height: viewport.height };
+        if (cancelled) return;
+        baseSizeRef.current = nextSize;
+        setPageBaseSize(nextSize);
+      } catch (error) {
+        if (!cancelled) {
+          console.warn("Failed to read base page size:", error);
+        }
+      }
+    };
+    void loadBaseSize();
+    return () => {
+      cancelled = true;
+    };
+  }, [pdfDoc]);
+
+  useEffect(() => {
+    if (!pageBaseSize) return;
+    if (hadBaseSizeRef.current) return;
+    hadBaseSizeRef.current = true;
+    if (currentPage > 1) {
+      scheduleJump(currentPage, 0);
+    }
+  }, [currentPage, pageBaseSize, scheduleJump]);
+
+  useEffect(() => {
+    const target = containerRef.current;
+    if (!target) return;
+    const observer = new ResizeObserver(() => {
+      if (!target) return;
+      setContainerSize({
+        width: target.clientWidth,
+        height: target.clientHeight,
+      });
+    });
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (retryScrollRef.current.length > 0) {
+        retryScrollRef.current.forEach((timer) => window.clearTimeout(timer));
+        retryScrollRef.current = [];
+      }
+    };
+  }, []);
+
+  const availableWidth = useMemo(
+    () => Math.max(0, containerSize.width - VIEWER_PADDING),
+    [containerSize.width]
+  );
+
+  const availableHeight = useMemo(
+    () => Math.max(0, containerSize.height - VIEWER_PADDING),
+    [containerSize.height]
+  );
+
+  const fitScale = useMemo(() => {
+    if (!pageBaseSize || !availableWidth || !availableHeight) return 1;
+    const widthScale = availableWidth / pageBaseSize.width;
+    if (fitMode === "page-width") {
+      return widthScale;
+    }
+    const heightScale = availableHeight / pageBaseSize.height;
+    return Math.min(widthScale, heightScale);
+  }, [availableHeight, availableWidth, fitMode, pageBaseSize]);
+
+  const effectiveScale = Math.max(0.1, fitScale * userScale);
+
+  const pageRenderSize = useMemo(() => {
+    if (!pageBaseSize) return null;
+    return {
+      width: pageBaseSize.width * effectiveScale,
+      height: pageBaseSize.height * effectiveScale,
+    };
+  }, [pageBaseSize, effectiveScale]);
+
+  const handlePageLoadSuccess = useCallback((page: PDFPageProxy) => {
+    if (baseSizeRef.current) return;
+    const viewport = page.getViewport({ scale: 1 });
+    const nextSize = { width: viewport.width, height: viewport.height };
+    baseSizeRef.current = nextSize;
+    setPageBaseSize(nextSize);
+  }, []);
+
+  const handleRangeChanged = useCallback(
+    ({ startIndex }: { startIndex: number; endIndex: number }) => {
+      const nextPage = startIndex + 1;
+      setCurrentPage((prev) => (prev === nextPage ? prev : nextPage));
+    },
+    []
+  );
+
+  const handleOutlineClick = useCallback(
+    async (item: OutlineNode) => {
+      if (item.url) {
+        window.open(item.url, "_blank", "noopener,noreferrer");
+        return;
+      }
+
+      const pdf = pdfRef.current;
+      if (!pdf || !item.dest) return;
+
+      try {
+        let destination: unknown = item.dest;
+        if (typeof destination === "string") {
+          destination = await pdf.getDestination(destination);
+        }
+        if (!Array.isArray(destination) || destination.length === 0) {
+          return;
+        }
+
+        const destinationArray = destination as unknown[];
+        const [ref] = destinationArray;
+        let pageNumber: number | null = null;
+        if (typeof ref === "number") {
+          pageNumber = ref + 1;
+        } else {
+          const pageIndex = await pdf.getPageIndex(ref);
+          pageNumber = pageIndex + 1;
+        }
+        if (!pageNumber) return;
+
+        let offset = 0;
+        const destType = destinationArray[1];
+        const destName =
+          typeof destType === "string"
+            ? destType
+            : destType &&
+                typeof destType === "object" &&
+                "name" in (destType as { name?: string })
+              ? (destType as { name?: string }).name
+              : null;
+        if (destName) {
+          const page = await pdf.getPage(pageNumber);
+          const viewport = page.getViewport({ scale: effectiveScale });
+          let top: number | null = null;
+          if (destName === "XYZ") {
+            const value = destinationArray[3];
+            if (typeof value === "number") top = value;
+          } else if (destName === "FitH" || destName === "FitBH") {
+            const value = destinationArray[2];
+            if (typeof value === "number") top = value;
+          } else if (destName === "FitR") {
+            const value = destinationArray[5];
+            if (typeof value === "number") top = value;
+          }
+          if (typeof top === "number") {
+            const [, y] = viewport.convertToViewportPoint(0, top);
+            const clamped = Math.max(0, Math.min(y, viewport.height - 1));
+            offset = clamped;
+          }
+        }
+
+        scheduleJump(pageNumber, offset);
+      } catch (error) {
+        console.warn("Failed to resolve outline destination:", error);
+      }
+    },
+    [effectiveScale, scheduleJump]
+  );
+
+  const renderOutlineItems = useCallback(
+    (items: OutlineNode[]) => {
+      if (!items.length) return null;
+      return (
+        <ul>
+          {items.map((item) => (
+            <li key={item.id}>
+              <div className="group flex items-center gap-2">
+                <button
+                  type="button"
+                  className="flex-1 text-left outline-link"
+                  onClick={() => {
+                    void handleOutlineClick(item);
+                  }}
+                >
+                  {item.title || "Untitled"}
+                </button>
+                {!item.url && (
+                  <button
+                    type="button"
+                    className="text-xs text-muted-foreground opacity-60 transition hover:opacity-100"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void handleOutlineSelectRange(item);
+                    }}
+                    title="Select this section"
+                  >
+                    Select
+                  </button>
+                )}
+              </div>
+              {item.items && item.items.length > 0 && (
+                <div className="ml-2">{renderOutlineItems(item.items)}</div>
+              )}
+            </li>
+          ))}
+        </ul>
+      );
+    },
+    [handleOutlineClick, handleOutlineSelectRange]
+  );
 
   const renderToolbar = useMemo(
     () => (
@@ -544,7 +812,7 @@ export function PdfViewer({
                 {fitMode === "page-width" ? "Fit" : "Width"}
               </Button>
               <span className="text-xs text-muted-foreground">
-                {Math.round(scale * 100)}%
+                {Math.round(effectiveScale * 100)}%
               </span>
             </div>
 
@@ -635,270 +903,13 @@ export function PdfViewer({
       pageInput,
       rangeInput.end,
       rangeInput.start,
-      scale,
       showSidebar,
+      effectiveScale,
     ]
-  );
-
-  const cleanupDocument = useCallback(async () => {
-    if (loadingTaskRef.current) {
-      await loadingTaskRef.current.destroy();
-      loadingTaskRef.current = null;
-    }
-    if (pdfRef.current) {
-      await pdfRef.current.destroy();
-      pdfRef.current = null;
-    }
-    setNumPages(0);
-    setCurrentPage(1);
-    setPageInput("1");
-    setOutlineItems([]);
-    setHasOutline(false);
-    hadOutlineRef.current = false;
-    setThumbnailAnchor(null);
-    outlinePageCacheRef.current.clear();
-    setLoadError(null);
-  }, []);
-
-  useEffect(() => {
-    const container = containerRef.current;
-    const viewer = viewerRef.current;
-    if (!container || !viewer) return;
-    if (pdfViewerRef.current) return;
-
-    const eventBus = new EventBus();
-    const linkService = new PDFLinkService({ eventBus });
-    const pdfViewer = new PDFViewer({
-      container,
-      viewer,
-      eventBus,
-      linkService,
-      annotationMode: ANNOTATION_MODE,
-      textLayerMode: TEXT_LAYER_MODE,
-      enableAutoLinking: false,
-    });
-    linkService.setViewer(pdfViewer);
-
-    eventBus.on("pagesinit", () => {
-      pdfViewer.currentScaleValue = fitModeRef.current;
-      setScale(pdfViewer.currentScale);
-      const targetPage = initialPageRef.current;
-      if (targetPage && targetPage >= 1 && targetPage <= pdfViewer.pagesCount) {
-        pdfViewer.currentPageNumber = targetPage;
-      }
-    });
-
-    eventBus.on("pagechanging", (event: { pageNumber: number }) => {
-      setCurrentPage(event.pageNumber);
-      setPageInput(String(event.pageNumber));
-    });
-
-    eventBusRef.current = eventBus;
-    linkServiceRef.current = linkService;
-    pdfViewerRef.current = pdfViewer;
-
-    return () => {
-      eventBusRef.current = null;
-      linkServiceRef.current = null;
-      pdfViewerRef.current = null;
-    };
-  }, [sourceUrl]);
-
-  useEffect(() => {
-    fitModeRef.current = fitMode;
-    const viewer = pdfViewerRef.current;
-    if (viewer) {
-      viewer.currentScaleValue = fitMode;
-      setScale(viewer.currentScale);
-    }
-  }, [fitMode]);
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const observer = new ResizeObserver(() => {
-      const viewer = pdfViewerRef.current;
-      if (viewer && fitMode === "page-width") {
-        viewer.currentScaleValue = "page-width";
-        setScale(viewer.currentScale);
-      }
-    });
-
-    observer.observe(container);
-    return () => observer.disconnect();
-  }, [fitMode]);
-
-  useEffect(() => {
-    const load = async () => {
-      if (!sourceUrl) {
-        await cleanupDocument();
-        const viewer = pdfViewerRef.current;
-        const linkService = linkServiceRef.current;
-        if (viewer && linkService) {
-          viewer.setDocument(null);
-          linkService.setDocument(null, null);
-        }
-        return;
-      }
-
-      setIsLoading(true);
-      setLoadError(null);
-      await cleanupDocument();
-      try {
-        const loadingTask = pdfjsLib.getDocument({
-          url: sourceUrl,
-          wasmUrl: `${PDFJS_CDN_BASE}wasm/`,
-          cMapUrl: `${PDFJS_CDN_BASE}cmaps/`,
-          cMapPacked: true,
-          standardFontDataUrl: `${PDFJS_CDN_BASE}standard_fonts/`,
-          iccUrl: `${PDFJS_CDN_BASE}iccs/`,
-        });
-        loadingTaskRef.current = loadingTask;
-        const pdf = await loadingTask.promise;
-        pdfRef.current = pdf;
-        setNumPages(pdf.numPages);
-        setCurrentPage(1);
-        setPageInput("1");
-
-        const pdfViewer = pdfViewerRef.current;
-        const linkService = linkServiceRef.current;
-        if (pdfViewer && linkService) {
-          pdfViewer.setDocument(pdf);
-          linkService.setDocument(pdf, null);
-        }
-
-        try {
-          const outline = await pdf.getOutline();
-          const normalized = assignOutlineIds(
-            (outline ?? []) as OutlineNodeInput[]
-          );
-          setOutlineItems(normalized);
-          setHasOutline(normalized.length > 0);
-          if (normalized.length > 0 && !hadOutlineRef.current) {
-            setSidebarTab("outline");
-            hadOutlineRef.current = true;
-          }
-          if (normalized.length === 0) {
-            hadOutlineRef.current = false;
-          }
-          outlinePageCacheRef.current.clear();
-        } catch (error) {
-          console.warn("Failed to load outline:", error);
-          setOutlineItems([]);
-          setHasOutline(false);
-          hadOutlineRef.current = false;
-          outlinePageCacheRef.current.clear();
-        }
-      } catch (error) {
-        console.error("Failed to load PDF:", error);
-        setLoadError("Failed to load PDF. Please try another file.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    void load();
-    return () => {
-      void cleanupDocument();
-    };
-  }, [cleanupDocument, sourceUrl]);
-
-  const handleOutlineClick = useCallback(async (item: OutlineNode) => {
-    if (item.url) {
-      window.open(item.url, "_blank", "noopener,noreferrer");
-      return;
-    }
-
-    const pdf = pdfRef.current;
-    const viewer = pdfViewerRef.current;
-    const linkService = linkServiceRef.current;
-    if (!pdf || !viewer || !item.dest) {
-      if (linkService && item.dest) {
-        linkService.navigateTo(item.dest);
-      }
-      return;
-    }
-
-    try {
-      let destination: unknown = item.dest;
-      if (typeof destination === "string") {
-        destination = await pdf.getDestination(destination);
-      }
-      if (!Array.isArray(destination) || destination.length === 0) {
-        if (linkService) linkService.navigateTo(item.dest);
-        return;
-      }
-
-      const destinationArray = destination as unknown[];
-      const [ref] = destinationArray;
-      let pageNumber: number | null = null;
-      if (typeof ref === "number") {
-        pageNumber = ref + 1;
-      } else {
-        const pageIndex = await pdf.getPageIndex(ref);
-        pageNumber = pageIndex + 1;
-      }
-      if (!pageNumber) return;
-
-      viewer.scrollPageIntoView({
-        pageNumber,
-        destArray: destinationArray,
-      });
-    } catch (error) {
-      console.warn("Failed to resolve outline destination:", error);
-      if (linkService) {
-        linkService.navigateTo(item.dest);
-      }
-    }
-  }, []);
-
-  // Helper for recursive outline render
-  const renderOutlineItems = useCallback(
-    (items: OutlineNode[]) => {
-      if (!items.length) return null;
-      return (
-        <ul>
-          {items.map((item) => (
-            <li key={item.id}>
-              <div className="group flex items-center gap-2">
-                <button
-                  type="button"
-                  className="flex-1 text-left outline-link"
-                  onClick={() => {
-                    void handleOutlineClick(item);
-                  }}
-                >
-                  {item.title || "Untitled"}
-                </button>
-                {!item.url && (
-                  <button
-                    type="button"
-                    className="text-xs text-muted-foreground opacity-60 transition hover:opacity-100"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      void handleOutlineSelectRange(item);
-                    }}
-                    title="Select this section"
-                  >
-                    Select
-                  </button>
-                )}
-              </div>
-              {item.items && item.items.length > 0 && (
-                <div className="ml-2">{renderOutlineItems(item.items)}</div>
-              )}
-            </li>
-          ))}
-        </ul>
-      );
-    },
-    [handleOutlineClick, handleOutlineSelectRange]
   );
 
   return (
     <Group orientation="horizontal" className="h-full">
-      {/* Sidebar Panel */}
       {showSidebar && numPages > 0 && (
         <>
           <Panel
@@ -951,23 +962,23 @@ export function PdfViewer({
                   </div>
                 )
               ) : (
-                <div className="space-y-2" ref={thumbnailRootRef}>
-                  {Array.from({ length: numPages }, (_, i) => i + 1).map(
-                    (page) => (
+                <Virtuoso
+                  style={{ height: "100%" }}
+                  totalCount={numPages}
+                  itemContent={(index) => {
+                    const page = index + 1;
+                    return (
                       <MemoizedThumbnailItem
                         key={`${fileKey}-${page}`}
                         pageNumber={page}
-                        pdf={pdfRef.current}
-                        rootRef={thumbnailRootRef}
-                        isSelected={
-                          page >= pageRange.start && page <= pageRange.end
-                        }
+                        pdf={pdfDoc}
+                        isSelected={page >= pageRange.start && page <= pageRange.end}
                         isCurrent={currentPage === page}
                         onSelect={handleThumbnailSelect}
                       />
-                    )
-                  )}
-                </div>
+                    );
+                  }}
+                />
               )}
             </div>
           </Panel>
@@ -977,15 +988,78 @@ export function PdfViewer({
         </>
       )}
 
-      {/* Main Viewer Panel */}
       <Panel className="relative flex flex-col bg-muted/30">
         {renderToolbar}
         <div className="flex-1 relative w-full h-full overflow-hidden">
           <div
             ref={containerRef}
-            className="absolute inset-0 overflow-auto p-4 pdfViewerContainer"
+            className="absolute inset-0 overflow-hidden p-4 pdfViewerContainer"
           >
-            <div className="pdfViewer" ref={viewerRef} />
+            {sourceUrl ? (
+              <div className="h-full w-full">
+                <Document
+                  file={sourceUrl}
+                  options={documentOptions}
+                  onLoadSuccess={handleDocumentLoadSuccess}
+                  onLoadError={handleDocumentLoadError}
+                  onItemClick={(event) => {
+                    if (event?.pageNumber) {
+                      scheduleJump(event.pageNumber, 0);
+                    }
+                  }}
+                  loading={null}
+                  error={null}
+                  noData={null}
+                  className="h-full w-full flex flex-col"
+                  style={{ height: "100%", width: "100%" }}
+                >
+                  <Virtuoso
+                    key={fileKey}
+                    ref={viewerRef}
+                    style={{ height: "100%", width: "100%" }}
+                    totalCount={numPages}
+                    initialTopMostItemIndex={Math.max(0, (initialPage ?? 1) - 1)}
+                    rangeChanged={handleRangeChanged}
+                    itemContent={(index) => (
+                      <div
+                        className="pdf-page-wrapper"
+                        style={
+                          pageRenderSize
+                            ? { height: pageRenderSize.height + PAGE_GAP }
+                            : undefined
+                        }
+                      >
+                        <div className="pdf-page">
+                          <Page
+                            pageNumber={index + 1}
+                            scale={effectiveScale}
+                            renderTextLayer
+                            renderAnnotationLayer
+                            onLoadSuccess={handlePageLoadSuccess}
+                            devicePixelRatio={
+                              typeof window !== "undefined"
+                                ? window.devicePixelRatio || 1
+                                : 1
+                            }
+                            loading={
+                              <div
+                                className="h-48 w-full rounded-lg bg-muted/40 animate-pulse"
+                                aria-label="Loading page"
+                              />
+                            }
+                          />
+                        </div>
+                        <div style={{ height: PAGE_GAP }} />
+                      </div>
+                    )}
+                  />
+                </Document>
+              </div>
+            ) : (
+              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                No PDF loaded
+              </div>
+            )}
             {isLoading && (
               <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm z-10">
                 <div className="flex flex-col items-center gap-2">

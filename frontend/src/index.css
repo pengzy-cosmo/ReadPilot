@@ -1,5 +1,6 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
-@import "pdfjs-dist/web/pdf_viewer.css";
+@import "react-pdf/dist/Page/AnnotationLayer.css";
+@import "react-pdf/dist/Page/TextLayer.css";
 @import "tailwindcss";
 @import "tw-animate-css";
 @plugin "tailwindcss-animate";
@@ -147,8 +148,12 @@
   @apply bg-muted/30 shadow-inner;
 }
 
-.pdfViewer .page {
-  @apply mb-4 rounded-lg shadow-sm border border-border/40 bg-card overflow-hidden;
+.pdf-page-wrapper {
+  @apply flex flex-col items-center;
+}
+
+.pdf-page {
+  @apply rounded-lg shadow-sm border border-border/40 bg-card overflow-hidden;
 }
 
 /* Keep text layer selectable but visually hidden to avoid double text */
