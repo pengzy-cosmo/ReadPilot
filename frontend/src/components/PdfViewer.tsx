@@ -4,6 +4,7 @@ import type {
   DocumentInitParameters,
   PDFDocumentProxy,
   PDFPageProxy,
+  RefProxy,
 } from "pdfjs-dist/types/src/display/api";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 
@@ -68,12 +69,20 @@ type PageSize = {
   height: number;
 };
 
+type ScrollBehaviorOption = "auto" | "smooth";
+
 const CONTEXT_WINDOW_MIN = 1;
 const CONTEXT_WINDOW_MAX = 12;
 const THUMBNAIL_TARGET_WIDTH = 120;
 const VIEWER_PADDING = 32;
 const PAGE_GAP = 16;
 const VIEWPORT_BUFFER_PAGES = 2;
+
+const isRefProxyValue = (value: unknown): value is RefProxy => {
+  if (!value || typeof value !== "object") return false;
+  const ref = value as { num?: unknown; gen?: unknown };
+  return typeof ref.num === "number" && typeof ref.gen === "number";
+};
 
 const assignOutlineIds = (
   items: OutlineNodeInput[],
@@ -235,7 +244,7 @@ export function PdfViewer({
   const scrollToPage = useCallback(
     (
       pageNumber: number,
-      options?: { behavior?: ScrollBehavior; offset?: number }
+      options?: { behavior?: ScrollBehaviorOption; offset?: number }
     ) => {
       viewerRef.current?.scrollToIndex({
         index: pageNumber - 1,
@@ -372,7 +381,7 @@ export function PdfViewer({
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
-      .replace(/\"/g, "&quot;")
+      .replace(/"/g, "&quot;")
       .replace(/'/g, "&#39;");
   }, []);
 
@@ -404,7 +413,7 @@ export function PdfViewer({
             const className = isActive
               ? "pdf-search-hit pdf-search-hit--active"
               : "pdf-search-hit";
-            result += `<mark class=\"${className}\" data-page=\"${pageNumber}\" data-hit=\"${hitIndex}\">${escapeHtml(
+            result += `<mark class="${className}" data-page="${pageNumber}" data-hit="${hitIndex}">${escapeHtml(
               matches[index]
             )}</mark>`;
           }
@@ -550,7 +559,7 @@ export function PdfViewer({
     if (!pending) return;
     const container = containerRef.current;
     if (!container) return;
-    const selector = `.pdf-search-hit[data-page=\"${pending.pageNumber}\"][data-hit=\"${pending.hitIndex}\"]`;
+    const selector = `.pdf-search-hit[data-page="${pending.pageNumber}"][data-hit="${pending.hitIndex}"]`;
     const mark = container.querySelector(selector);
     if (mark) {
       pendingHitRef.current = null;
@@ -573,6 +582,7 @@ export function PdfViewer({
       if (typeof ref === "number") {
         return ref + 1;
       }
+      if (!isRefProxyValue(ref)) return null;
       const pageIndex = await pdf.getPageIndex(ref);
       return pageIndex + 1;
     } catch (error) {
@@ -695,7 +705,7 @@ export function PdfViewer({
     } else {
       scrollToPendingHit();
     }
-  }, [scheduleJump, scrollToPendingHit, searchHits, searchIndex]);
+  }, [currentPage, scheduleJump, scrollToPendingHit, searchHits, searchIndex]);
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => scrollToPendingHit());
@@ -960,9 +970,11 @@ export function PdfViewer({
         let pageNumber: number | null = null;
         if (typeof ref === "number") {
           pageNumber = ref + 1;
-        } else {
+        } else if (isRefProxyValue(ref)) {
           const pageIndex = await pdf.getPageIndex(ref);
           pageNumber = pageIndex + 1;
+        } else {
+          pageNumber = null;
         }
         if (!pageNumber) return;
 
@@ -1006,7 +1018,7 @@ export function PdfViewer({
   );
 
   const renderOutlineItems = useCallback(
-    (items: OutlineNode[]) => {
+    function renderOutlineItems(items: OutlineNode[]) {
       if (!items.length) return null;
       return (
         <ul>
@@ -1270,8 +1282,7 @@ export function PdfViewer({
       isSearching,
       isSearchOpen,
       searchIndex,
-      searchProgress.current,
-      searchProgress.total,
+      searchProgress,
       searchQuery,
       searchHits.length,
     ]
@@ -1382,7 +1393,6 @@ export function PdfViewer({
                   error={null}
                   noData={null}
                   className="h-full w-full flex flex-col"
-                  style={{ height: "100%", width: "100%" }}
                 >
                   <Virtuoso
                     key={fileKey}

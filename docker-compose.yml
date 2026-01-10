@@ -8,6 +8,8 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
       READPILOT_DATA_DIR: /data
+      READPILOT_ALLOWED_ORIGINS: ${READPILOT_ALLOWED_ORIGINS:-http://localhost:5173}
+      READPILOT_ALLOW_ANY_ORIGIN: ${READPILOT_ALLOW_ANY_ORIGIN:-}
     volumes:
       - readpilot_data:/data
 
@@ -15,7 +17,7 @@ services:
     build:
       context: ./frontend
       args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+        VITE_API_URL: ${VITE_API_URL:-}
     ports:
       - "5173:5173"
     depends_on:

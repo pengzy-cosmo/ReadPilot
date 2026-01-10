@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from "react";
+import { getApiBaseUrl } from "../lib/apiBase";
 
 export interface Message {
   role: "user" | "assistant";
@@ -24,7 +25,7 @@ interface ApiConfig {
   model: string;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_URL = getApiBaseUrl();
 
 const parseErrorDetail = (raw: string) => {
   try {

@@ -1,4 +1,6 @@
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+import { getApiBaseUrl } from "./apiBase";
+
+const API_URL = getApiBaseUrl();
 
 export interface OutlineItem {
   level: number;
