@@ -9,194 +9,201 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+	--radius-sm: calc(var(--radius) - 4px);
+	--radius-md: calc(var(--radius) - 2px);
+	--radius-lg: var(--radius);
+	--radius-xl: calc(var(--radius) + 4px);
 
-  --font-sans: "Inter", system-ui, sans-serif;
+	--font-sans: "Inter", system-ui, sans-serif;
 
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
 
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
+	--color-card: var(--card);
+	--color-card-foreground: var(--card-foreground);
 
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
+	--color-popover: var(--popover);
+	--color-popover-foreground: var(--popover-foreground);
 
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
+	--color-primary: var(--primary);
+	--color-primary-foreground: var(--primary-foreground);
 
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
+	--color-secondary: var(--secondary);
+	--color-secondary-foreground: var(--secondary-foreground);
 
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
+	--color-muted: var(--muted);
+	--color-muted-foreground: var(--muted-foreground);
 
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
+	--color-accent: var(--accent);
+	--color-accent-foreground: var(--accent-foreground);
 
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
+	--color-destructive: var(--destructive);
+	--color-destructive-foreground: var(--destructive-foreground);
 
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
+	--color-border: var(--border);
+	--color-input: var(--input);
+	--color-ring: var(--ring);
 }
 
 :root {
-  --radius: 0.5rem;
+	--radius: 0.5rem;
 
-  /* Zinc-like Light Theme (OKLCH) */
-  --background: oklch(0.985 0.002 247.839);
-  /* Very light gray, almost white */
-  --foreground: oklch(0.141 0.005 285.823);
-  /* Dark gray, almost black */
+	/* Zinc-like Light Theme (OKLCH) */
+	--background: oklch(0.985 0.002 247.839);
+	/* Very light gray, almost white */
+	--foreground: oklch(0.141 0.005 285.823);
+	/* Dark gray, almost black */
 
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.141 0.005 285.823);
+	--card: oklch(1 0 0);
+	--card-foreground: oklch(0.141 0.005 285.823);
 
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.141 0.005 285.823);
+	--popover: oklch(1 0 0);
+	--popover-foreground: oklch(0.141 0.005 285.823);
 
-  --primary: oklch(0.141 0.005 285.823);
-  /* Dark main action */
-  --primary-foreground: oklch(0.985 0 0);
+	--primary: oklch(0.141 0.005 285.823);
+	/* Dark main action */
+	--primary-foreground: oklch(0.985 0 0);
 
-  --secondary: oklch(0.967 0.001 286.375);
-  /* Light gray for secondary actions */
-  --secondary-foreground: oklch(0.141 0.005 285.823);
+	--secondary: oklch(0.967 0.001 286.375);
+	/* Light gray for secondary actions */
+	--secondary-foreground: oklch(0.141 0.005 285.823);
 
-  --muted: oklch(0.967 0.001 286.375);
-  --muted-foreground: oklch(0.552 0.016 285.938);
-  /* Muted text */
+	--muted: oklch(0.967 0.001 286.375);
+	--muted-foreground: oklch(0.552 0.016 285.938);
+	/* Muted text */
 
-  --accent: oklch(0.967 0.001 286.375);
-  --accent-foreground: oklch(0.141 0.005 285.823);
+	--accent: oklch(0.967 0.001 286.375);
+	--accent-foreground: oklch(0.141 0.005 285.823);
 
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
+	--destructive: oklch(0.577 0.245 27.325);
+	--destructive-foreground: oklch(0.985 0 0);
 
-  --border: oklch(0.920 0.004 286.320);
-  --input: oklch(0.920 0.004 286.320);
-  --ring: oklch(0.141 0.005 285.823);
+	--border: oklch(0.92 0.004 286.32);
+	--input: oklch(0.92 0.004 286.32);
+	--ring: oklch(0.141 0.005 285.823);
 }
 
 .dark {
-  /* Zinc-like Dark Theme (OKLCH) */
-  --background: oklch(0.141 0.005 285.823);
-  --foreground: oklch(0.985 0 0);
+	/* Zinc-like Dark Theme (OKLCH) */
+	--background: oklch(0.141 0.005 285.823);
+	--foreground: oklch(0.985 0 0);
 
-  --card: oklch(0.18 0.005 285.823);
-  /* Slightly lighter than bg */
-  --card-foreground: oklch(0.985 0 0);
+	--card: oklch(0.18 0.005 285.823);
+	/* Slightly lighter than bg */
+	--card-foreground: oklch(0.985 0 0);
 
-  --popover: oklch(0.18 0.005 285.823);
-  --popover-foreground: oklch(0.985 0 0);
+	--popover: oklch(0.18 0.005 285.823);
+	--popover-foreground: oklch(0.985 0 0);
 
-  --primary: oklch(0.985 0 0);
-  /* White main action */
-  --primary-foreground: oklch(0.141 0.005 285.823);
+	--primary: oklch(0.985 0 0);
+	/* White main action */
+	--primary-foreground: oklch(0.141 0.005 285.823);
 
-  --secondary: oklch(0.23 0.006 285.823);
-  --secondary-foreground: oklch(0.985 0 0);
+	--secondary: oklch(0.23 0.006 285.823);
+	--secondary-foreground: oklch(0.985 0 0);
 
-  --muted: oklch(0.23 0.006 285.823);
-  --muted-foreground: oklch(0.65 0.01 285.823);
+	--muted: oklch(0.23 0.006 285.823);
+	--muted-foreground: oklch(0.65 0.01 285.823);
 
-  --accent: oklch(0.23 0.006 285.823);
-  --accent-foreground: oklch(0.985 0 0);
+	--accent: oklch(0.23 0.006 285.823);
+	--accent-foreground: oklch(0.985 0 0);
 
-  --destructive: oklch(0.396 0.141 25.723);
-  --destructive-foreground: oklch(0.985 0 0);
+	--destructive: oklch(0.396 0.141 25.723);
+	--destructive-foreground: oklch(0.985 0 0);
 
-  --border: oklch(0.23 0.006 285.823);
-  --input: oklch(0.23 0.006 285.823);
-  --ring: oklch(0.8 0 0);
+	--border: oklch(0.23 0.006 285.823);
+	--input: oklch(0.23 0.006 285.823);
+	--ring: oklch(0.8 0 0);
 }
 
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
+	* {
+		@apply border-border outline-ring/50;
+	}
 
-  body {
-    @apply bg-background text-foreground font-sans antialiased selection:bg-primary/10 selection:text-primary;
-  }
+	body {
+		@apply bg-background text-foreground font-sans antialiased selection:bg-primary/10 selection:text-primary;
+	}
 }
 
 /* Custom Utilities */
 .glass {
-  @apply bg-background/80 backdrop-blur-md border border-border/50;
+	@apply bg-background/80 backdrop-blur-md border border-border/50;
 }
 
 /* PDF Viewer Enhancements */
 .pdf-outline ul {
-  @apply ml-4 pl-2 border-l border-border/50;
+	@apply ml-4 pl-2 border-l border-border/50;
 }
 
 .pdf-outline li {
-  @apply my-0.5;
+	@apply my-0.5;
 }
 
 .pdf-outline .outline-link {
-  @apply block w-full text-left px-2 py-1 rounded-sm text-sm text-muted-foreground transition-colors hover:text-foreground hover:bg-muted/50 truncate;
+	@apply block w-full text-left px-2 py-1 rounded-sm text-sm text-muted-foreground transition-colors hover:text-foreground hover:bg-muted/50 truncate;
 }
 
 .pdfViewerContainer {
-  @apply bg-muted/30 shadow-inner;
+	@apply bg-muted/30 shadow-inner;
 }
 
 .pdf-page-wrapper {
-  @apply flex flex-col items-center;
+	@apply flex flex-col items-center;
 }
 
 .pdf-page {
-  @apply rounded-lg shadow-sm border border-border/40 bg-card overflow-hidden;
+	@apply rounded-lg shadow-sm border border-border/40 bg-card overflow-hidden;
 }
 
 /* Keep text layer selectable but visually hidden to avoid double text */
 .textLayer :is(span, br) {
-  color: transparent !important;
-  -webkit-text-fill-color: transparent !important;
-  text-shadow: none !important;
+	/* biome-ignore lint/complexity/noImportantStyles: required to override PDF text layer inline styles */
+	color: transparent !important;
+	/* biome-ignore lint/complexity/noImportantStyles: required to override PDF text layer inline styles */
+	-webkit-text-fill-color: transparent !important;
+	/* biome-ignore lint/complexity/noImportantStyles: required to override PDF text layer inline styles */
+	text-shadow: none !important;
 }
 
 .textLayer ::selection {
-  color: transparent;
-  -webkit-text-fill-color: transparent;
+	color: transparent;
+	-webkit-text-fill-color: transparent;
 }
 
 .textLayer ::-moz-selection {
-  color: transparent;
+	color: transparent;
 }
 
 .textLayer mark.pdf-search-hit {
-  background: #fef3c7;
-  color: #111 !important;
-  -webkit-text-fill-color: #111 !important;
-  padding: 0 1px;
-  border-radius: 2px;
+	background: #fef3c7;
+	/* biome-ignore lint/complexity/noImportantStyles: required to override PDF text layer inline styles */
+	color: #111 !important;
+	/* biome-ignore lint/complexity/noImportantStyles: required to override PDF text layer inline styles */
+	-webkit-text-fill-color: #111 !important;
+	padding: 0 1px;
+	border-radius: 2px;
 }
 
 .textLayer mark.pdf-search-hit--active {
-  background: #fb7185;
-  color: #111 !important;
-  -webkit-text-fill-color: #111 !important;
-  box-shadow: 0 0 0 1px rgba(190, 18, 60, 0.4);
+	background: #fb7185;
+	/* biome-ignore lint/complexity/noImportantStyles: required to override PDF text layer inline styles */
+	color: #111 !important;
+	/* biome-ignore lint/complexity/noImportantStyles: required to override PDF text layer inline styles */
+	-webkit-text-fill-color: #111 !important;
+	box-shadow: 0 0 0 1px rgba(190, 18, 60, 0.4);
 }
 
 /* Modern Scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+	width: 6px;
+	height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent;
+	background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-muted-foreground/20 rounded-full transition-colors hover:bg-muted-foreground/40;
+	@apply bg-muted-foreground/20 rounded-full transition-colors hover:bg-muted-foreground/40;
 }
