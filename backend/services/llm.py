@@ -27,12 +27,6 @@ Guidelines:
     if book_context.get("total_pages"):
         context_parts.append(f"- Total Pages: {book_context['total_pages']}")
 
-    if book_context.get("selected_range"):
-        context_parts.append(f"- Currently Selected Pages: {book_context['selected_range']}")
-
-    if book_context.get("current_page"):
-        context_parts.append(f"- User's Current Page: {book_context['current_page']}")
-
     if book_context.get("outline"):
         context_parts.append(f"\nTable of Contents:\n{book_context['outline']}")
 
@@ -87,10 +81,22 @@ async def chat_with_pdf(
             messages.append({"role": msg["role"], "content": msg["content"]})
 
     # Current user message with PDF attachment (OpenAI-compatible file input).
+    user_context_parts: list[str] = []
+    if context_dict:
+        if context_dict.get("current_page"):
+            user_context_parts.append(f"current_page={context_dict['current_page']}")
+        if context_dict.get("selected_range"):
+            user_context_parts.append(f"selected_range={context_dict['selected_range']}")
+
+    context_text = None
+    if user_context_parts:
+        context_text = "Context: " + ", ".join(user_context_parts) + ". The attached PDF contains the selected pages."
+
     messages.append(
         {
             "role": "user",
             "content": [
+                *([{"type": "text", "text": context_text}] if context_text else []),
                 {
                     "type": "file",
                     "file": {
