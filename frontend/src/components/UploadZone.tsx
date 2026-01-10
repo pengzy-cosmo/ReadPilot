@@ -99,9 +99,6 @@ export function UploadZone({ onFileSelect, isUploading }: UploadZoneProps) {
       </div>
 
       <div className="mt-8 text-center space-y-2">
-        <p className="text-sm text-muted-foreground">
-          Supported file: PDF (max 50MB)
-        </p>
         <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground/60">
           <span>Secure Processing</span>
           <span>•</span>
