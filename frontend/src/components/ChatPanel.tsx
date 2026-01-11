@@ -25,6 +25,7 @@ interface ChatPanelProps {
 	onOpenSessions: () => void;
 	sessionTitle?: string | null;
 	sessionSubtitle?: string | null;
+	pageRange?: { start: number; end: number } | null;
 	messages: Message[];
 	isLoading: boolean;
 	streamingContent: string;
@@ -40,6 +41,7 @@ export function ChatPanel({
 	onOpenSessions,
 	sessionTitle,
 	sessionSubtitle,
+	pageRange,
 	messages,
 	isLoading,
 	streamingContent,
@@ -70,6 +72,14 @@ export function ChatPanel({
 			return `Page ${meta.pageStart}`;
 		}
 		return `Pages ${meta.pageStart}-${meta.pageEnd}`;
+	};
+
+	const formatContextRange = (range?: { start: number; end: number } | null) => {
+		if (!range) return null;
+		if (range.start === range.end) {
+			return `Page ${range.start}`;
+		}
+		return `Pages ${range.start}-${range.end}`;
 	};
 
 	const handleSubmitMessage = async () => {
@@ -303,6 +313,14 @@ export function ChatPanel({
 						onSubmit={handleSubmit}
 						className="relative flex items-end gap-2 rounded-2xl border border-input bg-muted/20 shadow-sm focus-within:ring-1 focus-within:ring-ring transition-all hover:bg-muted/30"
 					>
+						{!disabled && pageRange && (
+							<span
+								className="pointer-events-none absolute left-3 top-0 -translate-y-1/2 rounded-full border border-border/60 bg-background px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
+								title="Current context page range"
+							>
+								{formatContextRange(pageRange)}
+							</span>
+						)}
 						<Textarea
 							value={input}
 							onChange={(event) => setInput(event.target.value)}

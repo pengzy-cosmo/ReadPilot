@@ -384,6 +384,7 @@ function App() {
 							onOpenSessions={handleOpenSessionList}
 							sessionTitle={sessionTitle}
 							sessionSubtitle={sessionSubtitle}
+							pageRange={docId ? pageRange : null}
 							messages={messages}
 							isLoading={isLoading}
 							streamingContent={streamingContent}
