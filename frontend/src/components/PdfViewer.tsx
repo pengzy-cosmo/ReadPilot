@@ -1,4 +1,19 @@
-import { Search, X } from "lucide-react";
+import {
+	BrainCircuit,
+	ChevronLeft,
+	ChevronRight,
+	FileText,
+	Maximize,
+	Menu,
+	Minimize,
+	PanelLeft,
+	RefreshCw,
+	Search,
+	Settings2,
+	X,
+	ZoomIn,
+	ZoomOut,
+} from "lucide-react";
 import type {
 	DocumentInitParameters,
 	PDFDocumentProxy,
@@ -12,6 +27,7 @@ import { Group, Panel, Separator } from "react-resizable-panels";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 const PDFJS_VERSION = (pdfjs as unknown as { version?: string }).version ?? "5.4.296";
 const PDFJS_CDN_BASE = `https://unpkg.com/pdfjs-dist@${PDFJS_VERSION}/`;
@@ -70,12 +86,12 @@ type PageSize = {
 
 type ScrollBehaviorOption = "auto" | "smooth";
 
+const THUMBNAIL_TARGET_WIDTH = 120;
+const VIEWPORT_BUFFER_PAGES = 2;
+const PAGE_GAP = 24;
+const VIEWER_PADDING = 48;
 const CONTEXT_WINDOW_MIN = 1;
 const CONTEXT_WINDOW_MAX = 12;
-const THUMBNAIL_TARGET_WIDTH = 120;
-const VIEWER_PADDING = 32;
-const PAGE_GAP = 16;
-const VIEWPORT_BUFFER_PAGES = 2;
 
 const isRefProxyValue = (value: unknown): value is RefProxy => {
 	if (!value || typeof value !== "object") return false;
@@ -84,7 +100,6 @@ const isRefProxyValue = (value: unknown): value is RefProxy => {
 };
 
 const assignOutlineIds = (items: OutlineNodeInput[], prefix = "outline"): OutlineNode[] =>
-	// Stable ids make outline rendering + caching predictable.
 	items.map((item, index) => {
 		const id = `${prefix}-${index}`;
 		return {
@@ -97,7 +112,6 @@ const assignOutlineIds = (items: OutlineNodeInput[], prefix = "outline"): Outlin
 	});
 
 const flattenOutline = (items: OutlineNode[], level = 0, acc: OutlineFlatItem[] = []) => {
-	// Flatten tree into a list for range selection and searching.
 	items.forEach((item) => {
 		acc.push({
 			id: item.id,
@@ -117,16 +131,18 @@ function ThumbnailItem({ pageNumber, pdf, isSelected, isCurrent, onSelect }: Thu
 	return (
 		<button
 			type="button"
-			className={`group w-full rounded-lg border p-2 text-left transition ${
-				isSelected ? "border-primary bg-primary/10" : "border-border bg-card hover:bg-muted/60"
-			} ${isCurrent ? "ring-1 ring-primary/60" : ""}`}
+			className={cn(
+				"group w-full rounded-lg border p-2 text-left transition-all duration-200 relative overflow-hidden",
+				isSelected ? "border-primary/50 bg-primary/5 shadow-sm" : "border-transparent hover:bg-muted/50",
+				isCurrent && "ring-2 ring-primary ring-offset-1",
+			)}
 			onClick={(event) => onSelect(pageNumber, event.shiftKey)}
 			title={`Select page ${pageNumber}`}
 		>
-			<div className="w-full flex items-center justify-center">
+			<div className="w-full flex items-center justify-center pointer-events-none opacity-90 group-hover:opacity-100 transition-opacity">
 				<Thumbnail pageNumber={pageNumber} pdf={pdf ?? undefined} width={THUMBNAIL_TARGET_WIDTH} />
 			</div>
-			<div className="mt-1 text-xs text-muted-foreground text-right">Page {pageNumber}</div>
+			<div className="mt-2 text-[10px] text-muted-foreground text-center font-medium font-mono">{pageNumber}</div>
 		</button>
 	);
 }
@@ -134,7 +150,6 @@ function ThumbnailItem({ pageNumber, pdf, isSelected, isCurrent, onSelect }: Thu
 const MemoizedThumbnailItem = memo(ThumbnailItem);
 
 const normalizePdfFromLoad = (value: PDFDocumentProxy | { pdf?: PDFDocumentProxy }): PDFDocumentProxy => {
-	// react-pdf may wrap the document in an object; normalize both shapes.
 	if (value && typeof value === "object" && "pdf" in value && (value as { pdf?: PDFDocumentProxy }).pdf) {
 		return (value as { pdf: PDFDocumentProxy }).pdf;
 	}
@@ -171,15 +186,12 @@ export function PdfViewer({
 	const [pageBaseSize, setPageBaseSize] = useState<PageSize | null>(null);
 	const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
 	const [isSearchOpen, setIsSearchOpen] = useState(false);
+	const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [activeQuery, setActiveQuery] = useState("");
 	const [searchHits, setSearchHits] = useState<{ pageNumber: number; hitIndex: number }[]>([]);
 	const [searchIndex, setSearchIndex] = useState(0);
 	const [isSearching, setIsSearching] = useState(false);
-	const [searchProgress, setSearchProgress] = useState({
-		current: 0,
-		total: 0,
-	});
 	const initialPageRef = useRef<number | null>(initialPage ?? null);
 	const fileKey = useMemo(() => sourceUrl ?? "empty", [sourceUrl]);
 
@@ -224,22 +236,13 @@ export function PdfViewer({
 
 	const scheduleJump = useCallback(
 		(pageNumber: number, offset = 0) => {
-			// Re-try scroll to ensure the virtualized list has rendered the target.
 			retryScrollRef.current.forEach((timer) => {
 				window.clearTimeout(timer);
 			});
 			retryScrollRef.current = [];
 			scrollToPage(pageNumber, { behavior: "auto", offset });
-			retryScrollRef.current.push(
-				window.setTimeout(() => {
-					scrollToPage(pageNumber, { behavior: "auto", offset });
-				}, 120),
-			);
-			retryScrollRef.current.push(
-				window.setTimeout(() => {
-					scrollToPage(pageNumber, { behavior: "auto", offset });
-				}, 420),
-			);
+			retryScrollRef.current.push(window.setTimeout(() => scrollToPage(pageNumber, { behavior: "auto", offset }), 120));
+			retryScrollRef.current.push(window.setTimeout(() => scrollToPage(pageNumber, { behavior: "auto", offset }), 420));
 		},
 		[scrollToPage],
 	);
@@ -265,7 +268,6 @@ export function PdfViewer({
 			const max = numPages || 1;
 			const start = Math.max(1, Math.min(nextStart, max));
 			const end = Math.max(1, Math.min(nextEnd, max));
-			// Normalize range even if inputs are flipped.
 			if (start <= end) {
 				onPageRangeChange({ start, end });
 			} else {
@@ -293,14 +295,8 @@ export function PdfViewer({
 		clampRange(pageRange.start, value);
 	}, [clampRange, pageRange.end, pageRange.start, rangeInput.end]);
 
-	const handleZoomIn = useCallback(() => {
-		setUserScale((prev) => Math.min(prev + 0.1, 3));
-	}, []);
-
-	const handleZoomOut = useCallback(() => {
-		setUserScale((prev) => Math.max(prev - 0.1, 0.5));
-	}, []);
-
+	const handleZoomIn = useCallback(() => setUserScale((prev) => Math.min(prev + 0.1, 3)), []);
+	const handleZoomOut = useCallback(() => setUserScale((prev) => Math.max(prev - 0.1, 0.5)), []);
 	const handleToggleFit = useCallback(() => {
 		setFitMode((prev) => (prev === "page-width" ? "page-fit" : "page-width"));
 		setUserScale(1);
@@ -328,11 +324,9 @@ export function PdfViewer({
 			searchAbortRef.current.canceled = true;
 			searchAbortRef.current = null;
 		}
-		// Reset all search-related UI + counters.
 		setIsSearching(false);
 		setSearchHits([]);
 		setSearchIndex(0);
-		setSearchProgress({ current: 0, total: 0 });
 		setActiveQuery("");
 		pendingHitRef.current = null;
 	}, []);
@@ -361,7 +355,6 @@ export function PdfViewer({
 
 	const makeTextRenderer = useCallback(
 		(pageNumber: number) => {
-			// Highlight search hits by injecting <mark> tags.
 			return ({ str }: { str: string }) => {
 				if (!activeQuery) return escapeHtml(str);
 				const escapedQuery = activeQuery.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -376,9 +369,7 @@ export function PdfViewer({
 						const hitIndex = getNextHitIndex(pageNumber);
 						const isActive = activeHit && activeHit.pageNumber === pageNumber && activeHit.hitIndex === hitIndex;
 						const className = isActive ? "pdf-search-hit pdf-search-hit--active" : "pdf-search-hit";
-						result += `<mark class="${className}" data-page="${pageNumber}" data-hit="${hitIndex}">${escapeHtml(
-							matches[index],
-						)}</mark>`;
+						result += `<mark class="${className}" data-page="${pageNumber}" data-hit="${hitIndex}">${escapeHtml(matches[index])}</mark>`;
 					}
 				});
 				return result;
@@ -396,15 +387,12 @@ export function PdfViewer({
 				return;
 			}
 			if (trimmed === activeQuery && searchHits.length > 0 && !isSearching) {
-				// If same query, just jump to the current hit.
 				const nextHit = searchHits[searchIndex];
 				if (nextHit) scheduleJump(nextHit.pageNumber, 0);
 				return;
 			}
 
-			if (searchAbortRef.current) {
-				searchAbortRef.current.canceled = true;
-			}
+			if (searchAbortRef.current) searchAbortRef.current.canceled = true;
 			const token = { canceled: false };
 			searchAbortRef.current = token;
 
@@ -414,7 +402,6 @@ export function PdfViewer({
 			setActiveQuery(trimmed);
 
 			const total = pdf.numPages;
-			setSearchProgress({ current: 0, total });
 			const matches: { pageNumber: number; hitIndex: number }[] = [];
 			const escapedQuery = trimmed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 			const regex = new RegExp(escapedQuery, "gi");
@@ -423,7 +410,6 @@ export function PdfViewer({
 				if (token.canceled) return;
 				let parts = textCacheRef.current.get(pageNumber);
 				if (!parts) {
-					// Cache extracted text to speed up repeated searches.
 					const page = await pdf.getPage(pageNumber);
 					const textContent = await page.getTextContent();
 					const rawItems = Array.isArray(textContent.items) ? textContent.items : [];
@@ -437,28 +423,18 @@ export function PdfViewer({
 				for (const part of parts) {
 					if (!part) continue;
 					regex.lastIndex = 0;
-					while (regex.exec(part) !== null) {
-						pageHitCount += 1;
-					}
+					while (regex.exec(part) !== null) pageHitCount += 1;
 				}
 				if (pageHitCount > 0) {
-					for (let i = 1; i <= pageHitCount; i += 1) {
-						matches.push({ pageNumber, hitIndex: i });
-					}
+					for (let i = 1; i <= pageHitCount; i += 1) matches.push({ pageNumber, hitIndex: i });
 				}
-				setSearchProgress({ current: pageNumber, total });
-				if (pageNumber % 4 === 0) {
-					// Yield to the UI thread during long searches.
-					await new Promise((resolve) => setTimeout(resolve, 0));
-				}
+				if (pageNumber % 4 === 0) await new Promise((resolve) => setTimeout(resolve, 0));
 			}
 
 			if (token.canceled) return;
 			setSearchHits(matches);
 			setIsSearching(false);
-			if (matches.length > 0) {
-				setSearchIndex(0);
-			}
+			if (matches.length > 0) setSearchIndex(0);
 		},
 		[activeQuery, clearSearch, isSearching, scheduleJump, searchIndex, searchHits],
 	);
@@ -499,6 +475,12 @@ export function PdfViewer({
 			}
 			return next;
 		});
+		setIsSettingsOpen(false);
+	}, []);
+
+	const handleToggleSettings = useCallback(() => {
+		setIsSettingsOpen((prev) => !prev);
+		setIsSearchOpen(false);
 	}, []);
 
 	const scrollToPendingHit = useCallback(() => {
@@ -519,18 +501,11 @@ export function PdfViewer({
 		if (!pdf || !dest) return null;
 		try {
 			let destination: unknown = dest;
-			if (typeof destination === "string") {
-				destination = await pdf.getDestination(destination);
-			}
-			if (!Array.isArray(destination) || destination.length === 0) {
-				return null;
-			}
+			if (typeof destination === "string") destination = await pdf.getDestination(destination);
+			if (!Array.isArray(destination) || destination.length === 0) return null;
 			const [ref] = destination as unknown[];
-			if (typeof ref === "number") {
-				return ref + 1;
-			}
+			if (typeof ref === "number") return ref + 1;
 			if (!isRefProxyValue(ref)) return null;
-			// Resolve PDF reference to a 1-based page number.
 			const pageIndex = await pdf.getPageIndex(ref);
 			return pageIndex + 1;
 		} catch (error) {
@@ -550,9 +525,7 @@ export function PdfViewer({
 			let pageNumber = outlinePageCacheRef.current.get(item.id) ?? null;
 			if (!pageNumber) {
 				pageNumber = await resolveDestPageNumber(item.dest);
-				if (pageNumber) {
-					outlinePageCacheRef.current.set(item.id, pageNumber);
-				}
+				if (pageNumber) outlinePageCacheRef.current.set(item.id, pageNumber);
 			}
 			resolved.push({ ...item, pageNumber });
 		}
@@ -566,7 +539,6 @@ export function PdfViewer({
 				setLocalAutoFollow(true);
 				return;
 			}
-			// Select from current heading to the next same-or-higher level heading.
 			const flat = await getOutlineFlatWithPages();
 			const currentIndex = flat.findIndex((entry) => entry.id === item.id);
 			if (currentIndex < 0) return;
@@ -614,35 +586,23 @@ export function PdfViewer({
 	}, [currentPage, onCurrentPageChange]);
 
 	useEffect(() => {
-		setRangeInput({
-			start: String(pageRange.start),
-			end: String(pageRange.end),
-		});
+		setRangeInput({ start: String(pageRange.start), end: String(pageRange.end) });
 	}, [pageRange.end, pageRange.start]);
 
 	useEffect(() => {
 		if (localAutoFollow && numPages > 0) {
-			// Keep range centered around the current page.
 			const start = Math.max(1, currentPage - contextWindowSize);
 			const end = Math.min(numPages, currentPage + contextWindowSize);
 			onPageRangeChange({ start, end });
 		}
 	}, [currentPage, localAutoFollow, contextWindowSize, numPages, onPageRangeChange]);
 
+	useEffect(() => setContextWindowSize(contextWindow), [contextWindow]);
 	useEffect(() => {
-		setContextWindowSize(contextWindow);
-	}, [contextWindow]);
-
-	useEffect(() => {
-		if (!hasOutline && sidebarTab === "outline") {
-			setSidebarTab("thumbnails");
-		}
+		if (!hasOutline && sidebarTab === "outline") setSidebarTab("thumbnails");
 	}, [hasOutline, sidebarTab]);
-
 	useEffect(() => {
-		if (!searchQuery.trim()) {
-			clearSearch();
-		}
+		if (!searchQuery.trim()) clearSearch();
 	}, [clearSearch, searchQuery]);
 
 	useEffect(() => {
@@ -650,11 +610,8 @@ export function PdfViewer({
 		const target = searchHits[searchIndex];
 		if (!target) return;
 		pendingHitRef.current = target;
-		if (target.pageNumber !== currentPage) {
-			scheduleJump(target.pageNumber, 0);
-		} else {
-			scrollToPendingHit();
-		}
+		if (target.pageNumber !== currentPage) scheduleJump(target.pageNumber, 0);
+		else scrollToPendingHit();
 	}, [currentPage, scheduleJump, scrollToPendingHit, searchHits, searchIndex]);
 
 	useEffect(() => {
@@ -672,17 +629,17 @@ export function PdfViewer({
 					searchInputRef.current?.focus();
 					searchInputRef.current?.select();
 				});
-			} else if (event.key === "Escape" && isSearchOpen) {
-				setIsSearchOpen(false);
+			} else if (event.key === "Escape") {
+				if (isSearchOpen) setIsSearchOpen(false);
+				if (isSettingsOpen) setIsSettingsOpen(false);
 			}
 		};
 		window.addEventListener("keydown", handler);
 		return () => window.removeEventListener("keydown", handler);
-	}, [isSearchOpen]);
+	}, [isSearchOpen, isSettingsOpen]);
 
 	useEffect(() => {
 		if (!sourceUrl) {
-			// Reset viewer state when document is cleared.
 			setNumPages(0);
 			setCurrentPage(1);
 			setPageInput("1");
@@ -701,17 +658,14 @@ export function PdfViewer({
 			hadOutlineRef.current = false;
 			textCacheRef.current.clear();
 			resetSearchUi();
-			if (retryScrollRef.current.length > 0) {
-				retryScrollRef.current.forEach((timer) => {
-					window.clearTimeout(timer);
-				});
-				retryScrollRef.current = [];
-			}
+			retryScrollRef.current.forEach((timer) => {
+				window.clearTimeout(timer);
+			});
+			retryScrollRef.current = [];
 			return;
 		}
 		setIsLoading(true);
 		setLoadError(null);
-		// Clear viewer state before loading a new document.
 		setNumPages(0);
 		setCurrentPage(1);
 		setPageInput("1");
@@ -726,12 +680,10 @@ export function PdfViewer({
 		baseSizeRef.current = null;
 		textCacheRef.current.clear();
 		resetSearchUi();
-		if (retryScrollRef.current.length > 0) {
-			retryScrollRef.current.forEach((timer) => {
-				window.clearTimeout(timer);
-			});
-			retryScrollRef.current = [];
-		}
+		retryScrollRef.current.forEach((timer) => {
+			window.clearTimeout(timer);
+		});
+		retryScrollRef.current = [];
 	}, [resetSearchUi, sourceUrl]);
 
 	const handleDocumentLoadSuccess = useCallback(
@@ -745,10 +697,7 @@ export function PdfViewer({
 			setIsLoading(false);
 			setLoadError(null);
 			const targetPage = initialPageRef.current;
-			// Respect the last-read page when opening a document.
-			if (targetPage && targetPage >= 1 && targetPage <= pdf.numPages) {
-				scheduleJump(targetPage, 0);
-			}
+			if (targetPage && targetPage >= 1 && targetPage <= pdf.numPages) scheduleJump(targetPage, 0);
 		},
 		[scheduleJump],
 	);
@@ -773,9 +722,7 @@ export function PdfViewer({
 					setSidebarTab("outline");
 					hadOutlineRef.current = true;
 				}
-				if (normalized.length === 0) {
-					hadOutlineRef.current = false;
-				}
+				if (normalized.length === 0) hadOutlineRef.current = false;
 				outlinePageCacheRef.current.clear();
 			} catch (error) {
 				if (cancelled) return;
@@ -797,7 +744,6 @@ export function PdfViewer({
 		let cancelled = false;
 		const loadBaseSize = async () => {
 			try {
-				// Use the first page to compute base sizing for fit/scale.
 				const page = await pdfDoc.getPage(1);
 				const viewport = page.getViewport({ scale: 1 });
 				const nextSize = { width: viewport.width, height: viewport.height };
@@ -805,9 +751,7 @@ export function PdfViewer({
 				baseSizeRef.current = nextSize;
 				setPageBaseSize(nextSize);
 			} catch (error) {
-				if (!cancelled) {
-					console.warn("Failed to read base page size:", error);
-				}
+				if (!cancelled) console.warn("Failed to read base page size:", error);
 			}
 		};
 		void loadBaseSize();
@@ -820,10 +764,7 @@ export function PdfViewer({
 		if (!pageBaseSize) return;
 		if (hadBaseSizeRef.current) return;
 		hadBaseSizeRef.current = true;
-		// If the initial page is not 1, scroll after size is known.
-		if (currentPage > 1) {
-			scheduleJump(currentPage, 0);
-		}
+		if (currentPage > 1) scheduleJump(currentPage, 0);
 	}, [currentPage, pageBaseSize, scheduleJump]);
 
 	useEffect(() => {
@@ -831,10 +772,7 @@ export function PdfViewer({
 		if (!target) return;
 		const observer = new ResizeObserver(() => {
 			if (!target) return;
-			setContainerSize({
-				width: target.clientWidth,
-				height: target.clientHeight,
-			});
+			setContainerSize({ width: target.clientWidth, height: target.clientHeight });
 		});
 		observer.observe(target);
 		return () => observer.disconnect();
@@ -842,12 +780,10 @@ export function PdfViewer({
 
 	useEffect(() => {
 		return () => {
-			if (retryScrollRef.current.length > 0) {
-				retryScrollRef.current.forEach((timer) => {
-					window.clearTimeout(timer);
-				});
-				retryScrollRef.current = [];
-			}
+			retryScrollRef.current.forEach((timer) => {
+				window.clearTimeout(timer);
+			});
+			retryScrollRef.current = [];
 			if (searchAbortRef.current) {
 				searchAbortRef.current.canceled = true;
 				searchAbortRef.current = null;
@@ -856,15 +792,12 @@ export function PdfViewer({
 	}, []);
 
 	const availableWidth = useMemo(() => Math.max(0, containerSize.width - VIEWER_PADDING), [containerSize.width]);
-
 	const availableHeight = useMemo(() => Math.max(0, containerSize.height - VIEWER_PADDING), [containerSize.height]);
 
 	const fitScale = useMemo(() => {
 		if (!pageBaseSize || !availableWidth || !availableHeight) return 1;
 		const widthScale = availableWidth / pageBaseSize.width;
-		if (fitMode === "page-width") {
-			return widthScale;
-		}
+		if (fitMode === "page-width") return widthScale;
 		const heightScale = availableHeight / pageBaseSize.height;
 		return Math.min(widthScale, heightScale);
 	}, [availableHeight, availableWidth, fitMode, pageBaseSize]);
@@ -873,10 +806,7 @@ export function PdfViewer({
 
 	const pageRenderSize = useMemo(() => {
 		if (!pageBaseSize) return null;
-		return {
-			width: pageBaseSize.width * effectiveScale,
-			height: pageBaseSize.height * effectiveScale,
-		};
+		return { width: pageBaseSize.width * effectiveScale, height: pageBaseSize.height * effectiveScale };
 	}, [pageBaseSize, effectiveScale]);
 
 	const handlePageLoadSuccess = useCallback((page: PDFPageProxy) => {
@@ -898,34 +828,24 @@ export function PdfViewer({
 				window.open(item.url, "_blank", "noopener,noreferrer");
 				return;
 			}
-
 			const pdf = pdfRef.current;
 			if (!pdf || !item.dest) return;
 
 			try {
 				let destination: unknown = item.dest;
-				if (typeof destination === "string") {
-					destination = await pdf.getDestination(destination);
-				}
-				if (!Array.isArray(destination) || destination.length === 0) {
-					return;
-				}
-
-				const destinationArray = destination as unknown[];
-				const [ref] = destinationArray;
+				if (typeof destination === "string") destination = await pdf.getDestination(destination);
+				if (!Array.isArray(destination) || destination.length === 0) return;
+				const [ref] = destination as unknown[];
 				let pageNumber: number | null = null;
-				if (typeof ref === "number") {
-					pageNumber = ref + 1;
-				} else if (isRefProxyValue(ref)) {
+				if (typeof ref === "number") pageNumber = ref + 1;
+				else if (isRefProxyValue(ref)) {
 					const pageIndex = await pdf.getPageIndex(ref);
 					pageNumber = pageIndex + 1;
-				} else {
-					pageNumber = null;
 				}
 				if (!pageNumber) return;
 
 				let offset = 0;
-				const destType = destinationArray[1];
+				const destType = (destination as unknown[])[1];
 				const destName =
 					typeof destType === "string"
 						? destType
@@ -936,23 +856,22 @@ export function PdfViewer({
 					const page = await pdf.getPage(pageNumber);
 					const viewport = page.getViewport({ scale: effectiveScale });
 					let top: number | null = null;
+					const args = destination as unknown[];
 					if (destName === "XYZ") {
-						const value = destinationArray[3];
+						const value = args[3];
 						if (typeof value === "number") top = value;
 					} else if (destName === "FitH" || destName === "FitBH") {
-						const value = destinationArray[2];
+						const value = args[2];
 						if (typeof value === "number") top = value;
 					} else if (destName === "FitR") {
-						const value = destinationArray[5];
+						const value = args[5];
 						if (typeof value === "number") top = value;
 					}
 					if (typeof top === "number") {
 						const [, y] = viewport.convertToViewportPoint(0, top);
-						const clamped = Math.max(0, Math.min(y, viewport.height - 1));
-						offset = clamped;
+						offset = Math.max(0, Math.min(y, viewport.height - 1));
 					}
 				}
-
 				scheduleJump(pageNumber, offset);
 			} catch (error) {
 				console.warn("Failed to resolve outline destination:", error);
@@ -962,52 +881,44 @@ export function PdfViewer({
 	);
 
 	const renderOutlineItems = useCallback(
-		function renderOutlineItems(items: OutlineNode[]) {
+		function renderOutlineItems(items: OutlineNode[], level = 0) {
 			if (!items.length) return null;
 			return (
-				<ul className="space-y-0.5">
+				<ul className={cn("space-y-0.5", level > 0 && "ml-3 border-l border-border/40 pl-2")}>
 					{items.map((item) => {
 						const isSelected = selectedOutlineId === item.id;
 						return (
 							<li key={item.id}>
-								<div
-									className={`group flex items-center gap-1 rounded-md px-1.5 py-1 transition ${
+								<button
+									type="button"
+									className={cn(
+										"group w-full flex items-center gap-2 rounded-sm px-2 py-1.5 transition-colors cursor-pointer text-sm text-left",
 										isSelected
-											? "bg-primary/10 text-foreground border border-primary/20"
-											: "border border-transparent hover:bg-muted/50"
-									}`}
+											? "bg-primary/10 text-primary font-medium"
+											: "hover:bg-muted text-muted-foreground hover:text-foreground",
+									)}
+									onClick={() => void handleOutlineClick(item)}
 								>
-									<button
-										type="button"
-										className="flex-1 text-left text-[13px] leading-snug outline-link"
-										onClick={() => {
-											void handleOutlineClick(item);
-										}}
-									>
-										{item.title || "Untitled"}
-									</button>
+									<span className="flex-1 truncate">{item.title || "Untitled"}</span>
 									{!item.url && (
-										<button
-											type="button"
-											aria-pressed={isSelected}
-											className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full border transition ${
-												isSelected
-													? "border-primary/40 text-primary"
-													: "border-border/60 text-muted-foreground hover:text-foreground"
-											}`}
+										<Button
+											variant="ghost"
+											size="icon"
+											className={cn(
+												"h-5 w-5 opacity-0 group-hover:opacity-100 transition-all scale-90 hover:scale-100",
+												isSelected && "opacity-100 text-primary bg-background shadow-sm",
+											)}
 											onClick={(event) => {
 												event.stopPropagation();
 												void handleOutlineSelectRange(item);
 											}}
-											title="Select this section"
+											title="Focus context on this section"
 										>
-											{isSelected ? "Selected" : "Select"}
-										</button>
+											<BrainCircuit className="h-3 w-3" />
+										</Button>
 									)}
-								</div>
-								{item.items && item.items.length > 0 && (
-									<div className="ml-2 pl-2 border-l border-border/30">{renderOutlineItems(item.items)}</div>
-								)}
+								</button>
+								{item.items && item.items.length > 0 && renderOutlineItems(item.items, level + 1)}
 							</li>
 						);
 					})}
@@ -1017,265 +928,250 @@ export function PdfViewer({
 		[handleOutlineClick, handleOutlineSelectRange, selectedOutlineId],
 	);
 
-	const renderToolbar = useMemo(
+	const renderCompactToolbar = useMemo(
 		() => (
-			<div className="flex flex-col border-b bg-muted/50">
-				<div className="flex items-center gap-2 p-2 flex-wrap">
-					<Button variant="outline" size="sm" onClick={onRequestOpenFile}>
-						Open PDF
-					</Button>
-
-					{numPages > 0 && (
-						<>
-							{!showSidebar && (
-								<Button
-									variant="outline"
-									size="sm"
-									onClick={() => {
-										setShowSidebar(true);
-									}}
-								>
-									Sidebar
-								</Button>
-							)}
-
-							<div className="flex items-center gap-1 ml-2">
-								<Input
-									type="number"
-									min={1}
-									max={numPages}
-									value={pageInput}
-									onChange={(e) => setPageInput(e.target.value)}
-									onBlur={handlePageInputCommit}
-									onKeyDown={(e) => {
-										if (e.key === "Enter") {
-											e.preventDefault();
-											handlePageInputCommit();
-										}
-									}}
-									className="w-16 h-8"
-								/>
-								<span className="text-sm text-muted-foreground">/ {numPages}</span>
-							</div>
-
-							<div className="flex items-center gap-1 ml-2">
-								<Button variant="outline" size="sm" onClick={handleZoomIn}>
-									+
-								</Button>
-								<Button variant="outline" size="sm" onClick={handleZoomOut}>
-									-
-								</Button>
-								<Button variant="outline" size="sm" onClick={handleToggleFit}>
-									{fitMode === "page-width" ? "Fit" : "Width"}
-								</Button>
-								<span className="text-xs text-muted-foreground">{Math.round(effectiveScale * 100)}%</span>
-							</div>
-
-							<div className="flex items-center gap-1 ml-2 border-l pl-2 shrink-0">
-								<span className="text-sm text-muted-foreground">Range:</span>
-								<Input
-									type="number"
-									min={1}
-									max={numPages}
-									value={rangeInput.start}
-									onChange={(e) => handleRangeStartChange(e.target.value)}
-									onBlur={commitRangeStart}
-									onKeyDown={(e) => {
-										if (e.key === "Enter") {
-											e.preventDefault();
-											commitRangeStart();
-										}
-									}}
-									disabled={localAutoFollow}
-									className="w-20 h-8"
-								/>
-								<span>-</span>
-								<Input
-									type="number"
-									min={1}
-									max={numPages}
-									value={rangeInput.end}
-									onChange={(e) => handleRangeEndChange(e.target.value)}
-									onBlur={commitRangeEnd}
-									onKeyDown={(e) => {
-										if (e.key === "Enter") {
-											e.preventDefault();
-											commitRangeEnd();
-										}
-									}}
-									disabled={localAutoFollow}
-									className="w-20 h-8"
-								/>
-								<Button
-									variant={localAutoFollow ? "default" : "outline"}
-									size="sm"
-									onClick={() => {
-										setLocalAutoFollow((prev) => {
-											const next = !prev;
-											if (next) {
-												setSelectedOutlineId(null);
-											}
-											return next;
-										});
-									}}
-									title={`Auto-follow: current page ±${contextWindowSize}`}
-								>
-									Auto
-								</Button>
-								<div className={`flex items-center gap-2 ml-2 ${localAutoFollow ? "" : "opacity-60"}`}>
-									<input
-										type="range"
-										min={CONTEXT_WINDOW_MIN}
-										max={CONTEXT_WINDOW_MAX}
-										value={contextWindowSize}
-										onChange={(event) => handleContextWindowChange(parseInt(event.target.value, 10))}
-										disabled={!localAutoFollow}
-										className="w-24"
-										aria-label="Auto-follow window size"
-									/>
-									<span className="text-xs text-muted-foreground">±{contextWindowSize}</span>
-								</div>
-							</div>
-
-							<Button
-								variant={isSearchOpen ? "default" : "outline"}
-								size="sm"
-								className="ml-auto"
-								onClick={handleToggleSearch}
-								title="Search (Ctrl+F)"
-							>
-								{isSearchOpen ? <X className="h-4 w-4" /> : <Search className="h-4 w-4" />}
-							</Button>
-						</>
+			<div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center justify-between p-1 glass rounded-xl shadow-lg border border-white/20 dark:border-white/5 transition-all duration-300 max-w-[90vw] w-auto gap-2">
+				{/* Left: Sidebar & File */}
+				<div className="flex items-center gap-0.5 pl-1">
+					{!showSidebar && (
+						<Button
+							variant="ghost"
+							size="icon"
+							className="h-8 w-8 text-muted-foreground hover:text-foreground"
+							onClick={() => setShowSidebar(true)}
+							title="Show Sidebar"
+						>
+							<PanelLeft className="h-4 w-4" />
+						</Button>
 					)}
+					<Button
+						variant="ghost"
+						size="icon"
+						className="h-8 w-8 text-muted-foreground hover:text-foreground"
+						onClick={onRequestOpenFile}
+						title="Open PDF"
+					>
+						<FileText className="h-4 w-4" />
+					</Button>
 				</div>
 
-				{isSearchOpen && (
-					<div className="flex items-center gap-2 px-2 py-1 border-t bg-muted/40">
+				<div className="h-6 w-px bg-border/50 mx-1" />
+
+				{/* Center: Navigation */}
+				<div className="flex items-center gap-1 shrink-0">
+					<Button
+						variant="ghost"
+						size="icon"
+						className="h-8 w-8 shrink-0"
+						onClick={() => scheduleJump(currentPage - 1)}
+						disabled={currentPage <= 1}
+					>
+						<ChevronLeft className="h-4 w-4" />
+					</Button>
+					<div className="flex items-center gap-1 px-1 whitespace-nowrap shrink-0 leading-none">
 						<Input
-							ref={searchInputRef}
-							type="search"
-							placeholder="Search"
-							value={searchQuery}
-							onChange={(e) => setSearchQuery(e.target.value)}
-							onKeyDown={(e) => {
-								if (e.key === "Enter") {
-									e.preventDefault();
-									if (e.shiftKey) {
-										handleSearchPrev();
-									} else {
-										handleSearchSubmit();
-									}
-								} else if (e.key === "Escape") {
-									setIsSearchOpen(false);
-								}
-							}}
-							className="w-56 h-8"
+							className="w-12 text-center text-sm p-0 border-none bg-transparent focus-visible:ring-0 font-medium tabular-nums shadow-none h-auto shrink-0 leading-none"
+							value={pageInput}
+							onChange={(e) => setPageInput(e.target.value)}
+							onBlur={handlePageInputCommit}
+							onKeyDown={(e) => e.key === "Enter" && handlePageInputCommit()}
 						/>
-						<Button
-							variant="outline"
-							size="sm"
-							onClick={handleSearchPrev}
-							disabled={isSearching || searchHits.length === 0}
-							title="Previous match"
-						>
-							Prev
-						</Button>
-						<Button
-							variant="outline"
-							size="sm"
-							onClick={handleSearchNext}
-							disabled={isSearching || searchHits.length === 0}
-							title="Next match"
-						>
-							Next
-						</Button>
-						{isSearching ? (
-							<span className="text-xs text-muted-foreground">
-								{searchProgress.current}/{searchProgress.total}
-							</span>
-						) : searchHits.length > 0 ? (
-							<span className="text-xs text-muted-foreground">
-								{searchIndex + 1}/{searchHits.length}
-							</span>
-						) : null}
+						<span className="text-[11px] text-muted-foreground tabular-nums opacity-60 shrink-0 select-none pt-0.5">
+							/ {numPages}
+						</span>
 					</div>
-				)}
+					<Button
+						variant="ghost"
+						size="icon"
+						className="h-8 w-8 shrink-0"
+						onClick={() => scheduleJump(currentPage + 1)}
+						disabled={currentPage >= numPages}
+					>
+						<ChevronRight className="h-4 w-4" />
+					</Button>
+				</div>
+
+				<div className="h-6 w-px bg-border/50 mx-1 hidden sm:block shrink-0" />
+
+				{/* Right Center: Zoom (Hidden on very small screens or collapsed) */}
+				<div className="hidden sm:flex items-center gap-0.5 shrink-0">
+					<Button
+						variant="ghost"
+						size="icon"
+						className="h-8 w-8 text-muted-foreground hover:text-foreground shrink-0"
+						onClick={handleZoomOut}
+					>
+						<ZoomOut className="h-4 w-4" />
+					</Button>
+					<span className="text-xs text-muted-foreground w-9 text-center tabular-nums shrink-0">
+						{Math.round(effectiveScale * 100)}%
+					</span>
+					<Button
+						variant="ghost"
+						size="icon"
+						className="h-8 w-8 text-muted-foreground hover:text-foreground shrink-0"
+						onClick={handleZoomIn}
+					>
+						<ZoomIn className="h-4 w-4" />
+					</Button>
+					<Button
+						variant="ghost"
+						size="icon"
+						className="h-8 w-8 text-muted-foreground hover:text-foreground shrink-0"
+						onClick={handleToggleFit}
+						title={fitMode === "page-width" ? "Fit to Page" : "Fit to Width"}
+					>
+						{fitMode === "page-width" ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+					</Button>
+				</div>
+
+				<div className="h-6 w-px bg-border/50 mx-1 shrink-0" />
+
+				{/* Right: AI & Tools */}
+				<div className="flex items-center gap-2 pr-1 shrink-0">
+					<div
+						className={cn(
+							"flex items-center gap-1 rounded-lg pl-2 pr-1 py-1 transition-all border shrink-0",
+							localAutoFollow ? "bg-primary/10 border-primary/20" : "bg-muted/40 border-transparent hover:bg-muted/60",
+						)}
+					>
+						<BrainCircuit
+							className={cn("h-3.5 w-3.5 shrink-0", localAutoFollow ? "text-primary" : "text-muted-foreground")}
+						/>
+						<Input
+							className="h-5 w-8 text-center text-xs p-0 border-none bg-transparent focus-visible:ring-0 font-medium tabular-nums text-foreground shadow-none shrink-0"
+							value={rangeInput.start}
+							onChange={(e) => handleRangeStartChange(e.target.value)}
+							onBlur={commitRangeStart}
+							onKeyDown={(e) => e.key === "Enter" && commitRangeStart()}
+						/>
+						<span className="text-[10px] text-muted-foreground shrink-0 select-none">/</span>
+						<Input
+							className="h-5 w-8 text-center text-xs p-0 border-none bg-transparent focus-visible:ring-0 font-medium tabular-nums text-foreground shadow-none shrink-0"
+							value={rangeInput.end}
+							onChange={(e) => handleRangeEndChange(e.target.value)}
+							onBlur={commitRangeEnd}
+							onKeyDown={(e) => e.key === "Enter" && commitRangeEnd()}
+						/>
+						<button
+							type="button"
+							onClick={() => setLocalAutoFollow(!localAutoFollow)}
+							className={cn(
+								"ml-1 h-5 w-5 rounded-full flex items-center justify-center transition-colors shrink-0",
+								localAutoFollow
+									? "text-primary hover:bg-primary/10"
+									: "text-muted-foreground hover:text-foreground hover:bg-muted",
+							)}
+							title="Toggle Auto-follow"
+						>
+							<RefreshCw className={cn("h-3 w-3", localAutoFollow && "animate-spin-once")} />
+						</button>
+						<div className="w-px h-3 bg-border/50 mx-1" />
+						<Button
+							variant="ghost"
+							size="icon"
+							className="h-5 w-5 text-muted-foreground hover:text-foreground shrink-0 rounded-full"
+							onClick={handleToggleSettings}
+							title="AI Context Settings"
+						>
+							<Settings2 className="h-3 w-3" />
+						</Button>
+					</div>
+
+					<Button
+						variant={isSearchOpen ? "secondary" : "ghost"}
+						size="icon"
+						className="h-8 w-8 text-muted-foreground hover:text-foreground shrink-0"
+						onClick={handleToggleSearch}
+						title="Search"
+					>
+						<Search className="h-4 w-4" />
+					</Button>
+				</div>
 			</div>
 		),
 		[
-			contextWindowSize,
-			fitMode,
-			commitRangeEnd,
-			commitRangeStart,
-			handleContextWindowChange,
-			handlePageInputCommit,
-			handleRangeEndChange,
-			handleRangeStartChange,
-			handleToggleFit,
-			handleZoomIn,
-			handleZoomOut,
-			onRequestOpenFile,
-			localAutoFollow,
-			numPages,
-			pageInput,
-			rangeInput.end,
-			rangeInput.start,
 			showSidebar,
+			onRequestOpenFile,
+			currentPage,
+			pageInput,
+			numPages,
+			handlePageInputCommit,
+			handleZoomOut,
 			effectiveScale,
-			handleToggleSearch,
-			handleSearchNext,
-			handleSearchPrev,
-			handleSearchSubmit,
-			isSearching,
+			handleZoomIn,
+			handleToggleFit,
+			fitMode,
+			rangeInput.start,
+			handleRangeStartChange,
+			commitRangeStart,
+			rangeInput.end,
+			handleRangeEndChange,
+			commitRangeEnd,
+			localAutoFollow,
 			isSearchOpen,
-			searchIndex,
-			searchProgress,
-			searchQuery,
-			searchHits.length,
+			handleToggleSearch,
+			scheduleJump,
+			handleToggleSettings,
 		],
 	);
 
 	return (
-		<Group orientation="horizontal" className="h-full">
+		<Group orientation="horizontal" className="h-full bg-muted/5">
 			{showSidebar && numPages > 0 && (
 				<>
-					<Panel defaultSize="280px" minSize="220px" maxSize="400px" className="flex flex-col bg-muted/10 !shrink-0">
-						<div className="flex items-center border-b">
-							<button
-								type="button"
-								className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
-									sidebarTab === "outline"
-										? "border-b-2 border-primary text-foreground"
-										: "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-								}`}
-								onClick={() => setSidebarTab("outline")}
+					<Panel
+						id="sidebar-panel"
+						defaultSize={25}
+						minSize={20}
+						className="flex flex-col bg-background border-r z-10 shadow-sm min-w-[240px]"
+					>
+						<div className="flex items-center justify-between p-3 border-b h-14 bg-background/50 backdrop-blur-sm shrink-0">
+							<div className="flex bg-muted/50 p-1 rounded-lg">
+								<button
+									type="button"
+									className={cn(
+										"px-3 py-1 text-xs font-medium rounded-md transition-all",
+										sidebarTab === "outline"
+											? "bg-background text-foreground shadow-sm"
+											: "text-muted-foreground hover:text-foreground",
+									)}
+									onClick={() => setSidebarTab("outline")}
+								>
+									Outline
+								</button>
+								<button
+									type="button"
+									className={cn(
+										"px-3 py-1 text-xs font-medium rounded-md transition-all",
+										sidebarTab === "thumbnails"
+											? "bg-background text-foreground shadow-sm"
+											: "text-muted-foreground hover:text-foreground",
+									)}
+									onClick={() => setSidebarTab("thumbnails")}
+								>
+									Thumbnails
+								</button>
+							</div>
+							<Button
+								variant="ghost"
+								size="icon"
+								className="h-8 w-8 text-muted-foreground hover:text-foreground"
+								onClick={() => setShowSidebar(false)}
 							>
-								Outline
-							</button>
-							<button
-								type="button"
-								className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
-									sidebarTab === "thumbnails"
-										? "border-b-2 border-primary text-foreground"
-										: "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-								}`}
-								onClick={() => setSidebarTab("thumbnails")}
-							>
-								Thumbnails
-							</button>
-							<Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setShowSidebar(false)}>
-								<span className="sr-only">Close sidebar</span>
-								&times;
+								<X className="h-4 w-4" />
 							</Button>
 						</div>
 
-						<div className="flex-1 overflow-auto p-2">
+						<div className="flex-1 overflow-auto p-3 scrollbar-thin">
 							{sidebarTab === "outline" ? (
 								hasOutline ? (
-									<div className="space-y-0.5 pdf-outline">{renderOutlineItems(outlineItems)}</div>
+									<div className="pdf-outline animate-in fade-in duration-300">{renderOutlineItems(outlineItems)}</div>
 								) : (
-									<div className="p-4 text-center text-sm text-muted-foreground">No outline available</div>
+									<div className="p-8 text-center text-sm text-muted-foreground flex flex-col items-center gap-3 opacity-60">
+										<Menu className="h-8 w-8 opacity-20" />
+										<p>No outline available</p>
+									</div>
 								)
 							) : (
 								<Virtuoso
@@ -1284,30 +1180,143 @@ export function PdfViewer({
 									itemContent={(index) => {
 										const page = index + 1;
 										return (
-											<MemoizedThumbnailItem
-												key={`${fileKey}-${page}`}
-												pageNumber={page}
-												pdf={pdfDoc}
-												isSelected={page >= pageRange.start && page <= pageRange.end}
-												isCurrent={currentPage === page}
-												onSelect={handleThumbnailSelect}
-											/>
+											<div className="pb-4 px-1">
+												<MemoizedThumbnailItem
+													key={`${fileKey}-${page}`}
+													pageNumber={page}
+													pdf={pdfDoc}
+													isSelected={page >= pageRange.start && page <= pageRange.end}
+													isCurrent={currentPage === page}
+													onSelect={handleThumbnailSelect}
+												/>
+											</div>
 										);
 									}}
 								/>
 							)}
 						</div>
 					</Panel>
-					<Separator className="w-2 bg-border/50 hover:bg-primary/50 transition-colors cursor-col-resize z-50 flex items-center justify-center">
-						<div className="h-8 w-1 bg-border rounded-full" />
+					<Separator className="w-2 -ml-1 bg-transparent hover:bg-primary/10 transition-colors cursor-col-resize z-50 flex justify-center">
+						<div className="w-px h-full bg-border/50" />
 					</Separator>
 				</>
 			)}
 
 			<Panel className="relative flex flex-col bg-muted/30">
-				{renderToolbar}
+				{numPages > 0 && renderCompactToolbar}
+
+				{/* Search Overlay */}
+				{isSearchOpen && (
+					<div className="absolute top-20 right-8 z-30 w-80 bg-popover/95 backdrop-blur text-popover-foreground shadow-xl rounded-xl border p-3 flex flex-col gap-3 animate-in fade-in zoom-in-95 slide-in-from-top-2 duration-200">
+						<div className="flex items-center gap-2">
+							<Search className="h-4 w-4 text-muted-foreground" />
+							<Input
+								ref={searchInputRef}
+								placeholder="Find in document..."
+								className="h-9 text-sm bg-muted/50 border-transparent focus:bg-background"
+								value={searchQuery}
+								onChange={(e) => setSearchQuery(e.target.value)}
+								onKeyDown={(e) => {
+									if (e.key === "Enter") {
+										if (e.shiftKey) handleSearchPrev();
+										else handleSearchSubmit();
+									} else if (e.key === "Escape") setIsSearchOpen(false);
+								}}
+							/>
+							<Button
+								variant="ghost"
+								size="icon"
+								className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
+								onClick={() => setIsSearchOpen(false)}
+							>
+								<X className="h-4 w-4" />
+							</Button>
+						</div>
+						<div className="flex items-center justify-between text-xs text-muted-foreground px-1">
+							<span className="font-medium">
+								{searchHits.length > 0
+									? `${searchIndex + 1} of ${searchHits.length}`
+									: isSearching
+										? "Searching..."
+										: "No results"}
+							</span>
+							<div className="flex items-center gap-1">
+								<Button
+									variant="outline"
+									size="icon"
+									className="h-7 w-7"
+									onClick={handleSearchPrev}
+									disabled={!searchHits.length}
+								>
+									<ChevronLeft className="h-3 w-3" />
+								</Button>
+								<Button
+									variant="outline"
+									size="icon"
+									className="h-7 w-7"
+									onClick={handleSearchNext}
+									disabled={!searchHits.length}
+								>
+									<ChevronRight className="h-3 w-3" />
+								</Button>
+							</div>
+						</div>
+					</div>
+				)}
+
+				{/* Settings Overlay */}
+				{isSettingsOpen && (
+					<div className="absolute top-20 right-8 z-30 w-72 bg-popover/95 backdrop-blur text-popover-foreground shadow-xl rounded-xl border p-4 flex flex-col gap-4 animate-in fade-in zoom-in-95 slide-in-from-top-2 duration-200">
+						<div className="flex items-center justify-between border-b pb-2">
+							<span className="font-medium text-sm">Settings</span>
+							<Button variant="ghost" size="icon" className="h-6 w-6 -mr-1" onClick={() => setIsSettingsOpen(false)}>
+								<X className="h-4 w-4" />
+							</Button>
+						</div>
+
+						<div className="space-y-3">
+							<div className="space-y-1.5">
+								<div className="flex items-center justify-between text-xs text-muted-foreground">
+									<span>Context Window</span>
+									<span>± {contextWindowSize} pages</span>
+								</div>
+								<input
+									type="range"
+									min={CONTEXT_WINDOW_MIN}
+									max={CONTEXT_WINDOW_MAX}
+									step={1}
+									value={contextWindowSize}
+									onChange={(e) => handleContextWindowChange(parseInt(e.target.value, 10))}
+									className="w-full h-1.5 bg-secondary rounded-full appearance-none cursor-pointer accent-primary"
+								/>
+								<p className="text-[10px] text-muted-foreground/70">
+									Pages to include before and after for AI context.
+								</p>
+							</div>
+
+							<div className="sm:hidden space-y-1.5 pt-2 border-t">
+								<div className="text-xs text-muted-foreground mb-1">Zoom & Layout</div>
+								<div className="flex items-center gap-1 justify-between">
+									<div className="flex items-center gap-1">
+										<Button variant="outline" size="icon" className="h-8 w-8" onClick={handleZoomOut}>
+											<ZoomOut className="h-4 w-4" />
+										</Button>
+										<span className="text-xs w-10 text-center">{Math.round(effectiveScale * 100)}%</span>
+										<Button variant="outline" size="icon" className="h-8 w-8" onClick={handleZoomIn}>
+											<ZoomIn className="h-4 w-4" />
+										</Button>
+									</div>
+									<Button variant="outline" size="icon" className="h-8 w-8" onClick={handleToggleFit}>
+										{fitMode === "page-width" ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+									</Button>
+								</div>
+							</div>
+						</div>
+					</div>
+				)}
+
 				<div className="flex-1 relative w-full h-full overflow-hidden">
-					<div ref={containerRef} className="absolute inset-0 overflow-hidden p-4 pdfViewerContainer">
+					<div ref={containerRef} className="absolute inset-0 overflow-hidden pdfViewerContainer">
 						{sourceUrl ? (
 							<div className="h-full w-full">
 								<Document
@@ -1316,9 +1325,7 @@ export function PdfViewer({
 									onLoadSuccess={handleDocumentLoadSuccess}
 									onLoadError={handleDocumentLoadError}
 									onItemClick={(event) => {
-										if (event?.pageNumber) {
-											scheduleJump(event.pageNumber, 0);
-										}
+										if (event?.pageNumber) scheduleJump(event.pageNumber, 0);
 									}}
 									loading={null}
 									error={null}
@@ -1334,17 +1341,26 @@ export function PdfViewer({
 										rangeChanged={handleRangeChanged}
 										defaultItemHeight={pageRenderSize ? pageRenderSize.height + PAGE_GAP : 800}
 										increaseViewportBy={pageRenderSize ? pageRenderSize.height * VIEWPORT_BUFFER_PAGES : 1600}
+										components={{
+											Header: () => <div style={{ height: 90 }} />,
+											Footer: () => <div style={{ height: 40 }} />,
+										}}
 										itemContent={(index) => {
 											const pageNumber = index + 1;
-											if (activeQuery) {
-												pageHitCounterRef.current.set(pageNumber, 0);
-											}
+											const isInContext = pageNumber >= pageRange.start && pageNumber <= pageRange.end;
+
+											if (activeQuery) pageHitCounterRef.current.set(pageNumber, 0);
 											return (
 												<div
-													className="pdf-page-wrapper"
+													className="pdf-page-wrapper relative"
 													style={pageRenderSize ? { height: pageRenderSize.height + PAGE_GAP } : undefined}
 												>
-													<div className="pdf-page">
+													<div
+														className={cn(
+															"pdf-page transition-all duration-300 relative",
+															isInContext ? "ring-1 ring-primary/30 shadow-lg" : "shadow-md hover:shadow-lg",
+														)}
+													>
 														<Page
 															pageNumber={pageNumber}
 															scale={effectiveScale}
@@ -1354,7 +1370,12 @@ export function PdfViewer({
 															customTextRenderer={activeQuery ? makeTextRenderer(pageNumber) : undefined}
 															devicePixelRatio={typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1}
 															loading={
-																<div className="h-48 w-full rounded-lg bg-muted/40 animate-pulse" aria-hidden="true" />
+																<div className="h-full w-full bg-muted/10 animate-pulse flex items-center justify-center">
+																	<div className="flex flex-col items-center gap-2 opacity-20">
+																		<FileText className="h-10 w-10" />
+																		<span className="text-xs">Loading Page {pageNumber}</span>
+																	</div>
+																</div>
 															}
 														/>
 													</div>
@@ -1366,22 +1387,42 @@ export function PdfViewer({
 								</Document>
 							</div>
 						) : (
-							<div className="flex h-full items-center justify-center text-sm text-muted-foreground">No PDF loaded</div>
+							<div className="flex flex-col h-full items-center justify-center text-sm text-muted-foreground gap-6 animate-in fade-in duration-500">
+								<div className="p-8 rounded-full bg-muted/30 border border-border/50 shadow-sm">
+									<FileText className="h-16 w-16 opacity-10" />
+								</div>
+								<div className="text-center space-y-2">
+									<p className="text-lg font-medium text-foreground">No Document Loaded</p>
+									<p className="max-w-xs mx-auto opacity-70">
+										Upload a PDF to start reading and chatting with your personal AI assistant.
+									</p>
+								</div>
+								<Button onClick={onRequestOpenFile} className="mt-4 shadow-lg shadow-primary/20">
+									Open Document
+								</Button>
+							</div>
 						)}
 						{isLoading && (
-							<div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm z-10">
-								<div className="flex flex-col items-center gap-2">
-									<div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-									<span className="text-sm font-medium">Loading PDF...</span>
+							<div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-[2px] z-50 animate-in fade-in duration-300">
+								<div className="flex flex-col items-center gap-4 p-6 rounded-2xl bg-card/80 shadow-xl border border-white/10">
+									<div className="h-12 w-12 animate-spin rounded-full border-[3px] border-primary border-t-transparent shadow-sm" />
+									<span className="text-sm font-medium animate-pulse">Loading Document...</span>
 								</div>
 							</div>
 						)}
 						{loadError && (
-							<div className="absolute inset-0 flex items-center justify-center bg-background/80 z-20">
-								<div className="bg-destructive/10 text-destructive p-4 rounded-lg flex flex-col items-center gap-2">
-									<p className="font-medium">Error</p>
-									<p>{loadError}</p>
-									<Button variant="outline" onClick={onRequestOpenFile}>
+							<div className="absolute inset-0 flex items-center justify-center bg-background/80 z-50 animate-in fade-in zoom-in-95 duration-300">
+								<div className="bg-destructive/5 text-destructive border border-destructive/10 p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-3 max-w-md text-center backdrop-blur-md">
+									<div className="p-3 rounded-full bg-destructive/10 mb-2">
+										<X className="h-8 w-8" />
+									</div>
+									<p className="font-semibold text-lg">Unable to load document</p>
+									<p className="text-sm opacity-80 leading-relaxed">{loadError}</p>
+									<Button
+										variant="outline"
+										className="mt-4 border-destructive/20 hover:bg-destructive/10"
+										onClick={onRequestOpenFile}
+									>
 										Try another file
 									</Button>
 								</div>
