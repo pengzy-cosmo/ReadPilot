@@ -4,7 +4,7 @@ import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import "katex/dist/katex.min.css";
-import { Bot, History, Plus, SendHorizontal, Sparkles, Trash2, User } from "lucide-react";
+import { Bot, History, Loader2, Plus, SendHorizontal, Sparkles, Trash2, User } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -113,7 +113,28 @@ export function ChatPanel({
 		</div>
 	);
 
+	const renderTypingIndicator = () => (
+		<div className="flex items-center gap-2 text-xs text-muted-foreground">
+			<span>Thinking</span>
+			<span className="flex items-center gap-1" aria-hidden="true">
+				<span
+					className="size-1.5 rounded-full bg-muted-foreground/70 animate-bounce"
+					style={{ animationDelay: "0ms" }}
+				/>
+				<span
+					className="size-1.5 rounded-full bg-muted-foreground/70 animate-bounce"
+					style={{ animationDelay: "150ms" }}
+				/>
+				<span
+					className="size-1.5 rounded-full bg-muted-foreground/70 animate-bounce"
+					style={{ animationDelay: "300ms" }}
+				/>
+			</span>
+		</div>
+	);
+
 	const showEmptyState = messages.length === 0 && !streamingContent;
+	const showLoadingIndicator = isLoading && !streamingContent;
 
 	return (
 		<div className="flex-1 flex flex-col min-h-0 bg-background border-l border-border/40 overflow-hidden">
@@ -223,7 +244,7 @@ export function ChatPanel({
 										className={cn(
 											"px-4 py-2.5 rounded-2xl shadow-sm text-sm leading-relaxed",
 											isUser
-												? "bg-primary text-primary-foreground rounded-tr-sm"
+												? "bg-primary/10 text-foreground border border-primary/20 rounded-tr-sm selection:bg-primary/20 selection:text-foreground"
 												: "bg-card border border-border/50 rounded-tl-sm",
 										)}
 									>
@@ -251,6 +272,24 @@ export function ChatPanel({
 								)}
 								<div className="px-4 py-2.5 rounded-2xl rounded-tl-sm bg-card border border-border/50 shadow-sm text-sm leading-relaxed w-full">
 									{renderMarkdown(streamingContent, true)}
+								</div>
+							</div>
+						</div>
+					)}
+
+					{showLoadingIndicator && (
+						<div className="flex gap-3 flex-row">
+							<div className="size-8 shrink-0 rounded-lg bg-muted flex items-center justify-center text-muted-foreground">
+								<Bot className="size-4" />
+							</div>
+							<div className="flex flex-col max-w-[85%] gap-1 items-start">
+								{streamingMeta && (
+									<span className="text-[10px] uppercase font-medium text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
+										{formatPageRange(streamingMeta)}
+									</span>
+								)}
+								<div className="px-4 py-2.5 rounded-2xl rounded-tl-sm bg-card border border-border/50 shadow-sm text-sm leading-relaxed w-full">
+									{renderTypingIndicator()}
 								</div>
 							</div>
 						</div>
@@ -290,7 +329,7 @@ export function ChatPanel({
 									: "bg-transparent text-muted-foreground hover:bg-muted",
 							)}
 						>
-							<SendHorizontal className="size-4" />
+							{isLoading ? <Loader2 className="size-4 animate-spin" /> : <SendHorizontal className="size-4" />}
 							<span className="sr-only">Send</span>
 						</Button>
 					</form>
