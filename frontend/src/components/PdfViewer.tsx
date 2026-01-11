@@ -413,6 +413,39 @@ export function PdfViewer({
 		[activeHit, activeQuery, escapeHtml, getNextHitIndex],
 	);
 
+	// Helper: scan a single page for matches
+	const scanPageForMatches = useCallback(
+		async (
+			pdf: PDFDocumentProxy,
+			pageNumber: number,
+			regex: RegExp,
+		): Promise<{ pageNumber: number; hitIndex: number }[]> => {
+			let parts = textCacheRef.current.get(pageNumber);
+			if (!parts) {
+				const page = await pdf.getPage(pageNumber);
+				const textContent = await page.getTextContent();
+				const rawItems = Array.isArray(textContent.items) ? textContent.items : [];
+				const strings = rawItems.map((item) =>
+					typeof (item as { str?: string }).str === "string" ? (item as { str: string }).str : "",
+				);
+				textCacheRef.current.set(pageNumber, strings);
+				parts = strings;
+			}
+			const hits: { pageNumber: number; hitIndex: number }[] = [];
+			let hitCount = 0;
+			for (const part of parts) {
+				if (!part) continue;
+				regex.lastIndex = 0;
+				while (regex.exec(part) !== null) {
+					hitCount += 1;
+					hits.push({ pageNumber, hitIndex: hitCount });
+				}
+			}
+			return hits;
+		},
+		[],
+	);
+
 	const runSearch = useCallback(
 		async (query: string) => {
 			const pdf = pdfRef.current;
@@ -421,12 +454,14 @@ export function PdfViewer({
 				clearSearch();
 				return;
 			}
+			// If same query and results exist, just jump to current hit
 			if (trimmed === activeQuery && searchHits.length > 0 && !isSearching) {
 				const nextHit = searchHits[searchIndex];
 				if (nextHit) scheduleJump(nextHit.pageNumber, 0);
 				return;
 			}
 
+			// Cancel any ongoing search
 			if (searchAbortRef.current) searchAbortRef.current.canceled = true;
 			const token = { canceled: false };
 			searchAbortRef.current = token;
@@ -437,41 +472,71 @@ export function PdfViewer({
 			setActiveQuery(trimmed);
 
 			const total = pdf.numPages;
-			const matches: { pageNumber: number; hitIndex: number }[] = [];
+			const startPage = currentPageRef.current;
 			const escapedQuery = trimmed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 			const regex = new RegExp(escapedQuery, "gi");
 
-			for (let pageNumber = 1; pageNumber <= total; pageNumber += 1) {
+			// Results from current page to end (forward matches)
+			const forwardMatches: { pageNumber: number; hitIndex: number }[] = [];
+			// Results from page 1 to current page - 1 (wrapped matches)
+			const wrappedMatches: { pageNumber: number; hitIndex: number }[] = [];
+
+			let firstMatchShown = false;
+
+			// Phase 1: Search from current page to end
+			for (let pageNumber = startPage; pageNumber <= total; pageNumber += 1) {
 				if (token.canceled) return;
-				let parts = textCacheRef.current.get(pageNumber);
-				if (!parts) {
-					const page = await pdf.getPage(pageNumber);
-					const textContent = await page.getTextContent();
-					const rawItems = Array.isArray(textContent.items) ? textContent.items : [];
-					const strings = rawItems.map((item) =>
-						typeof (item as { str?: string }).str === "string" ? (item as { str: string }).str : "",
-					);
-					textCacheRef.current.set(pageNumber, strings);
-					parts = strings;
+				const pageHits = await scanPageForMatches(pdf, pageNumber, regex);
+				// Check again after await - user may have canceled during scan
+				if (token.canceled) return;
+				if (pageHits.length > 0) {
+					forwardMatches.push(...pageHits);
+					// Show first match immediately for instant feedback
+					if (!firstMatchShown) {
+						firstMatchShown = true;
+						setSearchHits([...forwardMatches]);
+						setSearchIndex(0);
+						scheduleJump(pageHits[0].pageNumber, 0);
+					}
 				}
-				let pageHitCount = 0;
-				for (const part of parts) {
-					if (!part) continue;
-					regex.lastIndex = 0;
-					while (regex.exec(part) !== null) pageHitCount += 1;
+				if (pageNumber % 4 === 0) {
+					await new Promise((resolve) => setTimeout(resolve, 0));
+					if (token.canceled) return;
 				}
-				if (pageHitCount > 0) {
-					for (let i = 1; i <= pageHitCount; i += 1) matches.push({ pageNumber, hitIndex: i });
+			}
+
+			// Phase 2: Search from page 1 to current page - 1 (wrap around)
+			for (let pageNumber = 1; pageNumber < startPage; pageNumber += 1) {
+				if (token.canceled) return;
+				const pageHits = await scanPageForMatches(pdf, pageNumber, regex);
+				// Check again after await - user may have canceled during scan
+				if (token.canceled) return;
+				if (pageHits.length > 0) {
+					wrappedMatches.push(...pageHits);
+					// If no forward matches, show first wrapped match immediately
+					if (!firstMatchShown) {
+						firstMatchShown = true;
+						setSearchHits([...wrappedMatches]);
+						setSearchIndex(0);
+						scheduleJump(pageHits[0].pageNumber, 0);
+					}
 				}
-				if (pageNumber % 4 === 0) await new Promise((resolve) => setTimeout(resolve, 0));
+				if (pageNumber % 4 === 0) {
+					await new Promise((resolve) => setTimeout(resolve, 0));
+					if (token.canceled) return;
+				}
 			}
 
 			if (token.canceled) return;
-			setSearchHits(matches);
+
+			// Combine results: forward matches first (from current page), then wrapped matches
+			const allMatches = [...forwardMatches, ...wrappedMatches];
+			setSearchHits(allMatches);
 			setIsSearching(false);
-			if (matches.length > 0) setSearchIndex(0);
+			// Keep index at 0 (first match from current page or wrap)
+			if (allMatches.length > 0) setSearchIndex(0);
 		},
-		[activeQuery, clearSearch, isSearching, scheduleJump, searchIndex, searchHits],
+		[activeQuery, clearSearch, isSearching, scanPageForMatches, scheduleJump, searchHits, searchIndex],
 	);
 
 	const handleSearchPrev = useCallback(() => {
@@ -507,11 +572,14 @@ export function PdfViewer({
 					searchInputRef.current?.focus();
 					searchInputRef.current?.select();
 				});
+			} else {
+				// Clear search highlights when closing the search popup
+				clearSearch();
 			}
 			return next;
 		});
 		setIsSettingsOpen(false);
-	}, []);
+	}, [clearSearch]);
 
 	const handleToggleSettings = useCallback(() => {
 		setIsSettingsOpen((prev) => !prev);
@@ -686,13 +754,16 @@ export function PdfViewer({
 					searchInputRef.current?.select();
 				});
 			} else if (event.key === "Escape") {
-				if (isSearchOpen) setIsSearchOpen(false);
+				if (isSearchOpen) {
+					setIsSearchOpen(false);
+					clearSearch();
+				}
 				if (isSettingsOpen) setIsSettingsOpen(false);
 			}
 		};
 		window.addEventListener("keydown", handler);
 		return () => window.removeEventListener("keydown", handler);
-	}, [isSearchOpen, isSettingsOpen]);
+	}, [clearSearch, isSearchOpen, isSettingsOpen]);
 
 	useEffect(() => {
 		if (!sourceUrl) {
@@ -1182,7 +1253,10 @@ export function PdfViewer({
 										if (e.key === "Enter") {
 											if (e.shiftKey) handleSearchPrev();
 											else handleSearchSubmit();
-										} else if (e.key === "Escape") setIsSearchOpen(false);
+										} else if (e.key === "Escape") {
+											setIsSearchOpen(false);
+											clearSearch();
+										}
 									}}
 								/>
 								{searchQuery && (
@@ -1340,6 +1414,7 @@ export function PdfViewer({
 			handleSearchPrev,
 			handleSearchSubmit,
 			handleSearchNext,
+			clearSearch,
 		],
 	);
 
