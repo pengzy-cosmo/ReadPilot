@@ -1,3 +1,5 @@
+"""main - FastAPI application entry point with CORS and router setup."""
+
 import os
 
 from fastapi import FastAPI

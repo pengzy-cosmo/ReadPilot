@@ -1,3 +1,5 @@
+"""schemas - Pydantic models for API requests, responses, and database entities."""
+
 from pydantic import BaseModel, Field
 
 # === Chat Models ===

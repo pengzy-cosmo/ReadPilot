@@ -1,3 +1,5 @@
+"""library_service - SQLite-backed document storage with PDF parsing and page extraction."""
+
 import base64
 import hashlib
 import json

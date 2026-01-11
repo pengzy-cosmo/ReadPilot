@@ -1,3 +1,5 @@
+"""llm - OpenAI-compatible LLM client for streaming chat with PDF file attachments."""
+
 import os
 from collections.abc import AsyncIterator
 from typing import Any

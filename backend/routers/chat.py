@@ -1,3 +1,5 @@
+"""chat - API endpoint for streaming LLM chat with PDF context."""
+
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from starlette.concurrency import run_in_threadpool

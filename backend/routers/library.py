@@ -1,3 +1,5 @@
+"""library - API endpoints for document import, listing, and PDF streaming with Range support."""
+
 import os
 from collections.abc import Iterator
 from pathlib import Path

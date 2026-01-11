@@ -10,7 +10,7 @@ LLM-assisted PDF reader that provides context-aware document interaction by auto
 
 ## Quick Start
 
-### Using Just (Recommended)
+### Using Just
 
 ```bash
 just install

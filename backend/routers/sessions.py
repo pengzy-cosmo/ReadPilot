@@ -1,3 +1,5 @@
+"""sessions - API endpoints for chat session and message management."""
+
 from fastapi import APIRouter, HTTPException, Query
 
 from models.schemas import (
