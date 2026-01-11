@@ -160,6 +160,7 @@ export function PdfViewer({
 	const [showSidebar, setShowSidebar] = useState(true);
 	const [sidebarTab, setSidebarTab] = useState<"outline" | "thumbnails">("outline");
 	const [outlineItems, setOutlineItems] = useState<OutlineNode[]>([]);
+	const [selectedOutlineId, setSelectedOutlineId] = useState<string | null>(null);
 	const [fitMode, setFitMode] = useState<FitMode>("page-width");
 	const [userScale, setUserScale] = useState(1);
 	const [isLoading, setIsLoading] = useState(false);
@@ -307,11 +308,13 @@ export function PdfViewer({
 
 	const handleRangeStartChange = useCallback((value: string) => {
 		setLocalAutoFollow(false);
+		setSelectedOutlineId(null);
 		setRangeInput((prev) => ({ ...prev, start: value }));
 	}, []);
 
 	const handleRangeEndChange = useCallback((value: string) => {
 		setLocalAutoFollow(false);
+		setSelectedOutlineId(null);
 		setRangeInput((prev) => ({ ...prev, end: value }));
 	}, []);
 
@@ -558,6 +561,11 @@ export function PdfViewer({
 
 	const handleOutlineSelectRange = useCallback(
 		async (item: OutlineNode) => {
+			if (selectedOutlineId === item.id) {
+				setSelectedOutlineId(null);
+				setLocalAutoFollow(true);
+				return;
+			}
 			// Select from current heading to the next same-or-higher level heading.
 			const flat = await getOutlineFlatWithPages();
 			const currentIndex = flat.findIndex((entry) => entry.id === item.id);
@@ -577,15 +585,16 @@ export function PdfViewer({
 			setLocalAutoFollow(false);
 			onPageRangeChange({ start, end });
 			setThumbnailAnchor(start);
-			scheduleJump(start, 0);
+			setSelectedOutlineId(item.id);
 		},
-		[getOutlineFlatWithPages, numPages, onPageRangeChange, scheduleJump],
+		[getOutlineFlatWithPages, numPages, onPageRangeChange, selectedOutlineId],
 	);
 
 	const handleThumbnailSelect = useCallback(
 		(pageNumber: number, isRange: boolean) => {
 			if (!numPages) return;
 			setLocalAutoFollow(false);
+			setSelectedOutlineId(null);
 			if (isRange && thumbnailAnchor) {
 				const start = Math.max(1, Math.min(thumbnailAnchor, pageNumber));
 				const end = Math.min(numPages, Math.max(thumbnailAnchor, pageNumber));
@@ -679,6 +688,7 @@ export function PdfViewer({
 			setPageInput("1");
 			setOutlineItems([]);
 			setHasOutline(false);
+			setSelectedOutlineId(null);
 			setThumbnailAnchor(null);
 			setLoadError(null);
 			setIsLoading(false);
@@ -707,6 +717,7 @@ export function PdfViewer({
 		setPageInput("1");
 		setOutlineItems([]);
 		setHasOutline(false);
+		setSelectedOutlineId(null);
 		outlinePageCacheRef.current.clear();
 		hadOutlineRef.current = false;
 		hadBaseSizeRef.current = false;
@@ -954,40 +965,56 @@ export function PdfViewer({
 		function renderOutlineItems(items: OutlineNode[]) {
 			if (!items.length) return null;
 			return (
-				<ul>
-					{items.map((item) => (
-						<li key={item.id}>
-							<div className="group flex items-center gap-2">
-								<button
-									type="button"
-									className="flex-1 text-left outline-link"
-									onClick={() => {
-										void handleOutlineClick(item);
-									}}
+				<ul className="space-y-0.5">
+					{items.map((item) => {
+						const isSelected = selectedOutlineId === item.id;
+						return (
+							<li key={item.id}>
+								<div
+									className={`group flex items-center gap-1 rounded-md px-1.5 py-1 transition ${
+										isSelected
+											? "bg-primary/10 text-foreground border border-primary/20"
+											: "border border-transparent hover:bg-muted/50"
+									}`}
 								>
-									{item.title || "Untitled"}
-								</button>
-								{!item.url && (
 									<button
 										type="button"
-										className="text-xs text-muted-foreground opacity-60 transition hover:opacity-100"
-										onClick={(event) => {
-											event.stopPropagation();
-											void handleOutlineSelectRange(item);
+										className="flex-1 text-left text-[13px] leading-snug outline-link"
+										onClick={() => {
+											void handleOutlineClick(item);
 										}}
-										title="Select this section"
 									>
-										Select
+										{item.title || "Untitled"}
 									</button>
+									{!item.url && (
+										<button
+											type="button"
+											aria-pressed={isSelected}
+											className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full border transition ${
+												isSelected
+													? "border-primary/40 text-primary"
+													: "border-border/60 text-muted-foreground hover:text-foreground"
+											}`}
+											onClick={(event) => {
+												event.stopPropagation();
+												void handleOutlineSelectRange(item);
+											}}
+											title="Select this section"
+										>
+											{isSelected ? "Selected" : "Select"}
+										</button>
+									)}
+								</div>
+								{item.items && item.items.length > 0 && (
+									<div className="ml-2 pl-2 border-l border-border/30">{renderOutlineItems(item.items)}</div>
 								)}
-							</div>
-							{item.items && item.items.length > 0 && <div className="ml-2">{renderOutlineItems(item.items)}</div>}
-						</li>
-					))}
+							</li>
+						);
+					})}
 				</ul>
 			);
 		},
-		[handleOutlineClick, handleOutlineSelectRange],
+		[handleOutlineClick, handleOutlineSelectRange, selectedOutlineId],
 	);
 
 	const renderToolbar = useMemo(
@@ -1082,7 +1109,15 @@ export function PdfViewer({
 								<Button
 									variant={localAutoFollow ? "default" : "outline"}
 									size="sm"
-									onClick={() => setLocalAutoFollow(!localAutoFollow)}
+									onClick={() => {
+										setLocalAutoFollow((prev) => {
+											const next = !prev;
+											if (next) {
+												setSelectedOutlineId(null);
+											}
+											return next;
+										});
+									}}
 									title={`Auto-follow: current page ±${contextWindowSize}`}
 								>
 									Auto
@@ -1238,7 +1273,7 @@ export function PdfViewer({
 						<div className="flex-1 overflow-auto p-2">
 							{sidebarTab === "outline" ? (
 								hasOutline ? (
-									<div className="space-y-1 pdf-outline">{renderOutlineItems(outlineItems)}</div>
+									<div className="space-y-0.5 pdf-outline">{renderOutlineItems(outlineItems)}</div>
 								) : (
 									<div className="p-4 text-center text-sm text-muted-foreground">No outline available</div>
 								)
