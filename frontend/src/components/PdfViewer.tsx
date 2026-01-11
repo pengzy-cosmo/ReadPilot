@@ -92,6 +92,11 @@ const PAGE_GAP = 24;
 const VIEWER_PADDING = 48;
 const CONTEXT_WINDOW_MIN = 1;
 const CONTEXT_WINDOW_MAX = 12;
+const SIDEBAR_DEFAULT_SIZE = 28;
+const SIDEBAR_MIN_SIZE = 22;
+const SIDEBAR_DEFAULT_PX = 320;
+const SIDEBAR_MIN_PX = 240;
+const VIEWER_MIN_SIZE = 40;
 
 const isRefProxyValue = (value: unknown): value is RefProxy => {
 	if (!value || typeof value !== "object") return false;
@@ -185,6 +190,7 @@ export function PdfViewer({
 	const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null);
 	const [pageBaseSize, setPageBaseSize] = useState<PageSize | null>(null);
 	const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+	const [groupWidth, setGroupWidth] = useState(0);
 	const [isSearchOpen, setIsSearchOpen] = useState(false);
 	const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 	const [searchQuery, setSearchQuery] = useState("");
@@ -196,6 +202,7 @@ export function PdfViewer({
 	const fileKey = useMemo(() => sourceUrl ?? "empty", [sourceUrl]);
 
 	const containerRef = useRef<HTMLDivElement | null>(null);
+	const groupRef = useRef<HTMLDivElement | null>(null);
 	const viewerRef = useRef<VirtuosoHandle | null>(null);
 	const outlinePageCacheRef = useRef<Map<string, number>>(new Map());
 	const hadOutlineRef = useRef(false);
@@ -208,8 +215,29 @@ export function PdfViewer({
 	const searchAbortRef = useRef<{ canceled: boolean } | null>(null);
 	const searchInputRef = useRef<HTMLInputElement | null>(null);
 	const pendingHitRef = useRef<{ pageNumber: number; hitIndex: number } | null>(null);
+	const currentPageRef = useRef(1);
+	const pendingScrollPageRef = useRef<number | null>(null);
 
 	const activeHit = searchHits[searchIndex];
+	const sidebarSizes = useMemo(() => {
+		if (!groupWidth) {
+			return { minPercent: SIDEBAR_MIN_SIZE, defaultPercent: SIDEBAR_DEFAULT_SIZE };
+		}
+		const minPercent = Math.min(100 - VIEWER_MIN_SIZE, (SIDEBAR_MIN_PX / groupWidth) * 100);
+		const defaultPercent = Math.min(
+			100 - VIEWER_MIN_SIZE,
+			Math.max(minPercent, (SIDEBAR_DEFAULT_PX / groupWidth) * 100),
+		);
+		return { minPercent, defaultPercent };
+	}, [groupWidth]);
+
+	const groupDefaultLayout = useMemo((): Record<string, number> => {
+		if (!showSidebar || numPages <= 0) return { "viewer-panel": 100 };
+		return {
+			"sidebar-panel": sidebarSizes.defaultPercent,
+			"viewer-panel": 100 - sidebarSizes.defaultPercent,
+		};
+	}, [numPages, showSidebar, sidebarSizes.defaultPercent]);
 
 	const documentOptions = useMemo<DocumentInitParameters>(
 		() => ({
@@ -236,6 +264,7 @@ export function PdfViewer({
 
 	const scheduleJump = useCallback(
 		(pageNumber: number, offset = 0) => {
+			pendingScrollPageRef.current = pageNumber;
 			retryScrollRef.current.forEach((timer) => {
 				window.clearTimeout(timer);
 			});
@@ -246,6 +275,12 @@ export function PdfViewer({
 		},
 		[scrollToPage],
 	);
+	const clearScrollRetries = useCallback(() => {
+		retryScrollRef.current.forEach((timer) => {
+			window.clearTimeout(timer);
+		});
+		retryScrollRef.current = [];
+	}, []);
 
 	const handlePageInputCommit = useCallback(() => {
 		if (!numPages) return;
@@ -255,9 +290,9 @@ export function PdfViewer({
 			return;
 		}
 		const nextPage = Math.max(1, Math.min(numPages, value));
-		setPageInput(String(nextPage));
-		scrollToPage(nextPage);
-	}, [currentPage, numPages, pageInput, scrollToPage]);
+		setCurrentPage(nextPage);
+		scheduleJump(nextPage, 0);
+	}, [currentPage, numPages, pageInput, scheduleJump]);
 
 	useEffect(() => {
 		initialPageRef.current = initialPage ?? null;
@@ -483,6 +518,24 @@ export function PdfViewer({
 		setIsSearchOpen(false);
 	}, []);
 
+	const handleAutoFollowToggle = useCallback(() => {
+		setLocalAutoFollow((prev) => {
+			const next = !prev;
+			if (next) setSelectedOutlineId(null);
+			return next;
+		});
+	}, []);
+	const handlePageStep = useCallback(
+		(delta: number) => {
+			if (!numPages) return;
+			const basePage = pendingScrollPageRef.current ?? currentPageRef.current;
+			const next = Math.max(1, Math.min(numPages, basePage + delta));
+			setCurrentPage(next);
+			scheduleJump(next, 0);
+		},
+		[numPages, scheduleJump],
+	);
+
 	const scrollToPendingHit = useCallback(() => {
 		const pending = pendingHitRef.current;
 		if (!pending) return;
@@ -584,6 +637,9 @@ export function PdfViewer({
 		setPageInput(String(currentPage));
 		onCurrentPageChange?.(currentPage);
 	}, [currentPage, onCurrentPageChange]);
+	useEffect(() => {
+		currentPageRef.current = currentPage;
+	}, [currentPage]);
 
 	useEffect(() => {
 		setRangeInput({ start: String(pageRange.start), end: String(pageRange.end) });
@@ -658,10 +714,7 @@ export function PdfViewer({
 			hadOutlineRef.current = false;
 			textCacheRef.current.clear();
 			resetSearchUi();
-			retryScrollRef.current.forEach((timer) => {
-				window.clearTimeout(timer);
-			});
-			retryScrollRef.current = [];
+			clearScrollRetries();
 			return;
 		}
 		setIsLoading(true);
@@ -680,11 +733,8 @@ export function PdfViewer({
 		baseSizeRef.current = null;
 		textCacheRef.current.clear();
 		resetSearchUi();
-		retryScrollRef.current.forEach((timer) => {
-			window.clearTimeout(timer);
-		});
-		retryScrollRef.current = [];
-	}, [resetSearchUi, sourceUrl]);
+		clearScrollRetries();
+	}, [clearScrollRetries, resetSearchUi, sourceUrl]);
 
 	const handleDocumentLoadSuccess = useCallback(
 		(value: PDFDocumentProxy | { pdf?: PDFDocumentProxy }) => {
@@ -779,17 +829,25 @@ export function PdfViewer({
 	}, []);
 
 	useEffect(() => {
+		const target = groupRef.current;
+		if (!target) return;
+		const observer = new ResizeObserver(() => {
+			if (!target) return;
+			setGroupWidth(target.clientWidth);
+		});
+		observer.observe(target);
+		return () => observer.disconnect();
+	}, []);
+
+	useEffect(() => {
 		return () => {
-			retryScrollRef.current.forEach((timer) => {
-				window.clearTimeout(timer);
-			});
-			retryScrollRef.current = [];
+			clearScrollRetries();
 			if (searchAbortRef.current) {
 				searchAbortRef.current.canceled = true;
 				searchAbortRef.current = null;
 			}
 		};
-	}, []);
+	}, [clearScrollRetries]);
 
 	const availableWidth = useMemo(() => Math.max(0, containerSize.width - VIEWER_PADDING), [containerSize.width]);
 	const availableHeight = useMemo(() => Math.max(0, containerSize.height - VIEWER_PADDING), [containerSize.height]);
@@ -817,10 +875,20 @@ export function PdfViewer({
 		setPageBaseSize(nextSize);
 	}, []);
 
-	const handleRangeChanged = useCallback(({ startIndex }: { startIndex: number; endIndex: number }) => {
-		const nextPage = startIndex + 1;
-		setCurrentPage((prev) => (prev === nextPage ? prev : nextPage));
-	}, []);
+	const handleRangeChanged = useCallback(
+		({ startIndex }: { startIndex: number; endIndex: number }) => {
+			if (!numPages) return;
+			const visibleIndex = Math.min(numPages - 1, Math.max(0, startIndex + VIEWPORT_BUFFER_PAGES));
+			const nextPage = visibleIndex + 1;
+			const pendingPage = pendingScrollPageRef.current;
+			if (pendingPage) {
+				if (Math.abs(nextPage - pendingPage) > 1) return;
+				pendingScrollPageRef.current = null;
+			}
+			setCurrentPage((prev) => (prev === nextPage ? prev : nextPage));
+		},
+		[numPages],
+	);
 
 	const handleOutlineClick = useCallback(
 		async (item: OutlineNode) => {
@@ -930,9 +998,9 @@ export function PdfViewer({
 
 	const renderCompactToolbar = useMemo(
 		() => (
-			<div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center justify-between p-1 glass rounded-xl shadow-lg border border-white/20 dark:border-white/5 transition-all duration-300 max-w-[90vw] w-auto gap-2">
+			<div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center p-1 glass rounded-xl shadow-lg border border-white/20 dark:border-white/5 transition-all duration-300 max-w-[90vw] w-auto gap-2">
 				{/* Left: Sidebar & File */}
-				<div className="flex items-center gap-0.5 pl-1">
+				<div className="flex items-center gap-1 pl-1">
 					{!showSidebar && (
 						<Button
 							variant="ghost"
@@ -958,33 +1026,36 @@ export function PdfViewer({
 				<div className="h-6 w-px bg-border/50 mx-1" />
 
 				{/* Center: Navigation */}
-				<div className="flex items-center gap-1 shrink-0">
+				<div className="flex items-center gap-1 px-1.5 py-0.5 rounded-lg border border-border/60 bg-muted/40 shrink-0">
 					<Button
 						variant="ghost"
 						size="icon"
 						className="h-8 w-8 shrink-0"
-						onClick={() => scheduleJump(currentPage - 1)}
+						onClick={() => handlePageStep(-1)}
 						disabled={currentPage <= 1}
 					>
 						<ChevronLeft className="h-4 w-4" />
 					</Button>
-					<div className="flex items-center gap-1 px-1 whitespace-nowrap shrink-0 leading-none">
+					<div className="flex items-center gap-0.5 whitespace-nowrap shrink-0 leading-none">
 						<Input
-							className="w-12 text-center text-sm p-0 border-none bg-transparent focus-visible:ring-0 font-medium tabular-nums shadow-none h-auto shrink-0 leading-none"
+							type="text"
+							inputMode="numeric"
+							pattern="[0-9]*"
+							className="w-10 text-center text-sm p-0 border-none bg-transparent focus-visible:ring-0 font-medium tabular-nums shadow-none h-auto shrink-0 leading-none"
 							value={pageInput}
 							onChange={(e) => setPageInput(e.target.value)}
 							onBlur={handlePageInputCommit}
 							onKeyDown={(e) => e.key === "Enter" && handlePageInputCommit()}
 						/>
 						<span className="text-[11px] text-muted-foreground tabular-nums opacity-60 shrink-0 select-none pt-0.5">
-							/ {numPages}
+							/{numPages}
 						</span>
 					</div>
 					<Button
 						variant="ghost"
 						size="icon"
 						className="h-8 w-8 shrink-0"
-						onClick={() => scheduleJump(currentPage + 1)}
+						onClick={() => handlePageStep(1)}
 						disabled={currentPage >= numPages}
 					>
 						<ChevronRight className="h-4 w-4" />
@@ -1028,18 +1099,21 @@ export function PdfViewer({
 				<div className="h-6 w-px bg-border/50 mx-1 shrink-0" />
 
 				{/* Right: AI & Tools */}
-				<div className="flex items-center gap-2 pr-1 shrink-0">
+				<div className="flex items-center gap-1 pr-1 shrink-0">
 					<div
 						className={cn(
-							"flex items-center gap-1 rounded-lg pl-2 pr-1 py-1 transition-all border shrink-0",
-							localAutoFollow ? "bg-primary/10 border-primary/20" : "bg-muted/40 border-transparent hover:bg-muted/60",
+							"flex items-center gap-0.5 rounded-lg px-1.5 py-1 transition-all border shrink-0",
+							localAutoFollow ? "bg-primary/10 border-primary/20" : "bg-muted/40 border-border/40 hover:bg-muted/60",
 						)}
 					>
 						<BrainCircuit
 							className={cn("h-3.5 w-3.5 shrink-0", localAutoFollow ? "text-primary" : "text-muted-foreground")}
 						/>
 						<Input
-							className="h-5 w-8 text-center text-xs p-0 border-none bg-transparent focus-visible:ring-0 font-medium tabular-nums text-foreground shadow-none shrink-0"
+							type="text"
+							inputMode="numeric"
+							pattern="[0-9]*"
+							className="h-5 w-7 text-center text-xs p-0 border-none bg-transparent focus-visible:ring-0 font-medium tabular-nums text-foreground shadow-none shrink-0"
 							value={rangeInput.start}
 							onChange={(e) => handleRangeStartChange(e.target.value)}
 							onBlur={commitRangeStart}
@@ -1047,7 +1121,10 @@ export function PdfViewer({
 						/>
 						<span className="text-[10px] text-muted-foreground shrink-0 select-none">/</span>
 						<Input
-							className="h-5 w-8 text-center text-xs p-0 border-none bg-transparent focus-visible:ring-0 font-medium tabular-nums text-foreground shadow-none shrink-0"
+							type="text"
+							inputMode="numeric"
+							pattern="[0-9]*"
+							className="h-5 w-7 text-center text-xs p-0 border-none bg-transparent focus-visible:ring-0 font-medium tabular-nums text-foreground shadow-none shrink-0"
 							value={rangeInput.end}
 							onChange={(e) => handleRangeEndChange(e.target.value)}
 							onBlur={commitRangeEnd}
@@ -1055,7 +1132,7 @@ export function PdfViewer({
 						/>
 						<button
 							type="button"
-							onClick={() => setLocalAutoFollow(!localAutoFollow)}
+							onClick={handleAutoFollowToggle}
 							className={cn(
 								"ml-1 h-5 w-5 rounded-full flex items-center justify-center transition-colors shrink-0",
 								localAutoFollow
@@ -1066,17 +1143,17 @@ export function PdfViewer({
 						>
 							<RefreshCw className={cn("h-3 w-3", localAutoFollow && "animate-spin-once")} />
 						</button>
-						<div className="w-px h-3 bg-border/50 mx-1" />
-						<Button
-							variant="ghost"
-							size="icon"
-							className="h-5 w-5 text-muted-foreground hover:text-foreground shrink-0 rounded-full"
-							onClick={handleToggleSettings}
-							title="AI Context Settings"
-						>
-							<Settings2 className="h-3 w-3" />
-						</Button>
 					</div>
+
+					<Button
+						variant="ghost"
+						size="icon"
+						className="h-8 w-8 text-muted-foreground hover:text-foreground shrink-0"
+						onClick={handleToggleSettings}
+						title="AI Context Settings"
+					>
+						<Settings2 className="h-4 w-4" />
+					</Button>
 
 					<Button
 						variant={isSearchOpen ? "secondary" : "ghost"}
@@ -1097,6 +1174,7 @@ export function PdfViewer({
 			pageInput,
 			numPages,
 			handlePageInputCommit,
+			handlePageStep,
 			handleZoomOut,
 			effectiveScale,
 			handleZoomIn,
@@ -1109,22 +1187,28 @@ export function PdfViewer({
 			handleRangeEndChange,
 			commitRangeEnd,
 			localAutoFollow,
+			handleAutoFollowToggle,
 			isSearchOpen,
 			handleToggleSearch,
-			scheduleJump,
 			handleToggleSettings,
 		],
 	);
 
 	return (
-		<Group orientation="horizontal" className="h-full bg-muted/5">
+		<Group
+			orientation="horizontal"
+			className="h-full bg-muted/5"
+			id="pdf-viewer"
+			defaultLayout={groupDefaultLayout}
+			elementRef={groupRef}
+		>
 			{showSidebar && numPages > 0 && (
 				<>
 					<Panel
 						id="sidebar-panel"
-						defaultSize={25}
-						minSize={20}
-						className="flex flex-col bg-background border-r z-10 shadow-sm min-w-[240px]"
+						defaultSize={sidebarSizes.defaultPercent}
+						minSize={sidebarSizes.minPercent}
+						className="flex flex-col bg-background border-r z-10 shadow-sm"
 					>
 						<div className="flex items-center justify-between p-3 border-b h-14 bg-background/50 backdrop-blur-sm shrink-0">
 							<div className="flex bg-muted/50 p-1 rounded-lg">
@@ -1202,7 +1286,7 @@ export function PdfViewer({
 				</>
 			)}
 
-			<Panel className="relative flex flex-col bg-muted/30">
+			<Panel id="viewer-panel" minSize={VIEWER_MIN_SIZE} className="relative flex flex-col bg-muted/30">
 				{numPages > 0 && renderCompactToolbar}
 
 				{/* Search Overlay */}
@@ -1275,7 +1359,7 @@ export function PdfViewer({
 						</div>
 
 						<div className="space-y-3">
-							<div className="space-y-1.5">
+							<div className={cn("space-y-1.5", !localAutoFollow && "opacity-60")}>
 								<div className="flex items-center justify-between text-xs text-muted-foreground">
 									<span>Context Window</span>
 									<span>± {contextWindowSize} pages</span>
@@ -1287,6 +1371,8 @@ export function PdfViewer({
 									step={1}
 									value={contextWindowSize}
 									onChange={(e) => handleContextWindowChange(parseInt(e.target.value, 10))}
+									disabled={!localAutoFollow}
+									aria-label="Auto-follow window size"
 									className="w-full h-1.5 bg-secondary rounded-full appearance-none cursor-pointer accent-primary"
 								/>
 								<p className="text-[10px] text-muted-foreground/70">
