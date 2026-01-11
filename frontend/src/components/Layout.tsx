@@ -1,3 +1,4 @@
+/** Layout - Root layout wrapper for the application. */
 import type { ReactNode } from "react";
 
 interface LayoutProps {

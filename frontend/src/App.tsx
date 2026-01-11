@@ -1,3 +1,4 @@
+/** App - Main application: PDF viewer (left) + AI chat (right). */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Group, Panel, Separator } from "react-resizable-panels";
 import { Toaster, toast } from "sonner";
@@ -230,9 +231,9 @@ function App() {
 		setSessionSubtitle(`Updated · ${timestamp}`);
 	}, [deriveSessionTitle, messages, sessionId, sessionTitle]);
 
+	// Persist document state (page position, range, session) with debounce
 	useEffect(() => {
 		if (!docId) return;
-		// Debounce state persistence to reduce backend chatter during scrolling.
 		const timer = setTimeout(() => {
 			void updateDocumentState(docId, {
 				last_page: currentPage,

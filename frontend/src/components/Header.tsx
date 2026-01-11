@@ -1,3 +1,4 @@
+/** Header - App header with logo, library button, and settings. */
 import { BookOpen, Loader2, Settings } from "lucide-react";
 
 import { Button } from "@/components/ui/button";

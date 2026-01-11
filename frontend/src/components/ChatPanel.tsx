@@ -1,3 +1,4 @@
+/** ChatPanel - AI chat interface with streaming responses and markdown support. */
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeKatex from "rehype-katex";
@@ -52,9 +53,9 @@ export function ChatPanel({
 	const scrollRootRef = useRef<HTMLDivElement>(null);
 	const scrollViewportRef = useRef<HTMLDivElement | null>(null);
 
+	// Auto-scroll to bottom when new messages arrive or during streaming
 	useEffect(() => {
 		if (messages.length === 0 && !streamingContent) return;
-		// Auto-scroll the message list when new content arrives.
 		if (!scrollViewportRef.current && scrollRootRef.current) {
 			scrollViewportRef.current = scrollRootRef.current.querySelector('[data-slot="scroll-area-viewport"]');
 		}
@@ -111,15 +112,13 @@ export function ChatPanel({
 		onClear();
 	};
 
+	/** Render markdown with GFM tables and LaTeX math support. */
 	const renderMarkdown = (content: string, showCaret = false) => (
 		<div className="prose prose-sm dark:prose-invert max-w-none break-words">
 			<ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
 				{content}
 			</ReactMarkdown>
-			{showCaret && (
-				// Streaming caret for partial assistant output.
-				<span className="animate-pulse inline-block w-1.5 h-3.5 bg-primary ml-0.5 align-middle" />
-			)}
+			{showCaret && <span className="animate-pulse inline-block w-1.5 h-3.5 bg-primary ml-0.5 align-middle" />}
 		</div>
 	);
 

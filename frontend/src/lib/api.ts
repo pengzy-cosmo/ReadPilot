@@ -1,3 +1,4 @@
+/** api - Backend API client for documents, sessions, and messages. */
 import { getApiBaseUrl } from "./apiBase";
 
 // Centralized API base URL for frontend requests.

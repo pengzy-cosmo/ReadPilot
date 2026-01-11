@@ -1,3 +1,4 @@
+/** UploadZone - Drag-and-drop zone for PDF file upload. */
 import { FileUp, Loader2, Upload } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 

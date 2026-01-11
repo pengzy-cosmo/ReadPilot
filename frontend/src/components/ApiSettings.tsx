@@ -1,3 +1,4 @@
+/** ApiSettings - Modal for configuring API key, base URL, and model. */
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";

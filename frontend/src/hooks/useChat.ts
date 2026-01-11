@@ -1,3 +1,4 @@
+/** useChat - Hook for managing chat state and streaming API responses. */
 import { useCallback, useRef, useState } from "react";
 import { getApiBaseUrl } from "../lib/apiBase";
 
