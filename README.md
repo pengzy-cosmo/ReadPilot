@@ -10,11 +10,11 @@ Requires [Docker Compose](https://docs.docker.com/compose/install/).
 
 1. **Configure Environment**
 
-   Copy the example config and set your OpenAI API key (or compatible provider):
+   Copy the example config and set your API key (or use UI settings):
 
    ```bash
    cp .env.example .env
-   # Edit .env to set OPENAI_API_KEY=sk-...
+   # Optional: Set OPENAI_API_KEY, ANTHROPIC_API_KEY, or GEMINI_API_KEY
    ```
 
 2. **Run**
@@ -55,7 +55,9 @@ npm run dev
 
 | Variable             | Description                               | Default                     |
 | -------------------- | ----------------------------------------- | --------------------------- |
-| `OPENAI_API_KEY`     | API Key for LLM service                   | -                           |
+| `OPENAI_API_KEY`     | OpenAI API Key                            | -                           |
+| `ANTHROPIC_API_KEY`  | Anthropic API Key                         | -                           |
+| `GEMINI_API_KEY`     | Google Gemini API Key                     | -                           |
 | `OPENAI_BASE_URL`    | Custom endpoint (e.g. for LocalAI/Ollama) | `https://api.openai.com/v1` |
 | `READPILOT_DATA_DIR` | PDF & Metadata storage path               | `./storage`                 |
 

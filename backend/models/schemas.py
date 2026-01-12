@@ -1,6 +1,17 @@
 """schemas - Pydantic models for API requests, responses, and database entities."""
 
+from enum import Enum
+
 from pydantic import BaseModel, Field
+
+
+class LLMProvider(str, Enum):
+    """Supported LLM providers."""
+
+    OPENAI = "openai"  # OpenAI compatible (default)
+    ANTHROPIC = "anthropic"
+    GEMINI = "gemini"
+
 
 # === Chat Models ===
 
@@ -36,9 +47,10 @@ class ChatRequest(BaseModel):
     book_context: BookContext | None = None
 
     # API config
+    provider: LLMProvider = LLMProvider.OPENAI
     api_key: str | None = None
-    base_url: str | None = None
-    model: str = "gpt-5.2"
+    base_url: str | None = None  # Only used for OpenAI compatible
+    model: str | None = None  # None = use provider's default model
 
 
 # === Library Models ===

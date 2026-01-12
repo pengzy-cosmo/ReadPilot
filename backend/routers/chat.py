@@ -6,7 +6,7 @@ from starlette.concurrency import run_in_threadpool
 
 from models.schemas import ChatRequest
 from services.library_service import library_service
-from services.llm import chat_with_pdf
+from services.llm import LLMError, chat_with_pdf
 
 router = APIRouter()
 
@@ -50,17 +50,31 @@ async def chat(request: ChatRequest):
         async def generate():
             # Accumulate streamed chunks to persist the full assistant reply.
             full_content = ""
-            async for chunk in chat_with_pdf(
-                pdf_base64=pdf_base64,
-                question=request.question,
-                history=request.history,
-                book_context=request.book_context,
-                api_key=request.api_key,
-                base_url=request.base_url,
-                model=request.model,
-            ):
-                full_content += chunk
-                yield chunk
+            try:
+                async for chunk in chat_with_pdf(
+                    pdf_base64=pdf_base64,
+                    question=request.question,
+                    history=request.history,
+                    book_context=request.book_context,
+                    provider=request.provider,
+                    api_key=request.api_key,
+                    base_url=request.base_url,
+                    model=request.model,
+                ):
+                    full_content += chunk
+                    yield chunk
+            except LLMError as e:
+                # Yield error message as part of the stream so frontend can display it
+                error_msg = f"\n\n**Error:** {e}"
+                full_content += error_msg
+                yield error_msg
+            except Exception as e:
+                # Catch any unexpected errors
+                error_msg = f"\n\n**Error:** An unexpected error occurred: {e}"
+                full_content += error_msg
+                yield error_msg
+
+            # Only save assistant message if we got content (even if it's an error)
             if full_content:
                 await run_in_threadpool(
                     library_service.append_message,
@@ -74,6 +88,8 @@ async def chat(request: ChatRequest):
         return StreamingResponse(generate(), media_type="text/plain")
     except HTTPException:
         raise
+    except LLMError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:

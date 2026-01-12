@@ -1,6 +1,7 @@
 /** useChat - Hook for managing chat state and streaming API responses. */
 import { useCallback, useRef, useState } from "react";
 import { getApiBaseUrl } from "../lib/apiBase";
+import type { ApiConfig } from "../lib/apiConfig";
 
 export interface Message {
 	id: string;
@@ -20,12 +21,6 @@ export interface BookContext {
 	outline?: string;
 	overview?: string;
 	highlights?: string[]; // User-selected text passages for focused context
-}
-
-interface ApiConfig {
-	apiKey: string;
-	baseUrl: string;
-	model: string;
 }
 
 const API_URL = getApiBaseUrl();
@@ -124,9 +119,10 @@ export function useChat(apiConfig: ApiConfig) {
 									highlights: bookContext.highlights,
 								}
 							: undefined,
-						api_key: apiConfig.apiKey || undefined,
-						base_url: apiConfig.baseUrl || undefined,
-						model: apiConfig.model || "gpt-5.2",
+						provider: apiConfig.provider,
+						api_key: apiConfig.apiKeys[apiConfig.provider] || undefined,
+						base_url: apiConfig.provider === "openai" ? apiConfig.baseUrl || undefined : undefined,
+						model: apiConfig.model,
 					}),
 				});
 
