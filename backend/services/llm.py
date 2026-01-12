@@ -131,10 +131,12 @@ def parse_llm_error(error: Exception, model: str) -> LLMError:
     # Detect PDF/file type not supported errors (be specific to avoid false positives)
     pdf_unsupported_patterns = [
         "invalid value: `file`",
+        "invalid part type: file",
         "supported values are: `text`, `image_url`",
         "unsupported content type",
         "file type not supported",
         "pdf is not supported",
+        "content type 'file' is not supported",
     ]
     if any(pattern in error_msg for pattern in pdf_unsupported_patterns):
         return PDFNotSupportedError(

@@ -61,6 +61,8 @@ npm run dev
 | `OPENAI_BASE_URL`    | Custom endpoint (e.g. for LocalAI/Ollama) | `https://api.openai.com/v1` |
 | `READPILOT_DATA_DIR` | PDF & Metadata storage path               | `./storage`                 |
 
+> **Note**: ReadPilot requires models with **native PDF input support** (e.g., models from OpenAI, Anthropic, or Google Gemini).
+
 ## License
 
 MIT
