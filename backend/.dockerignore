@@ -1,5 +1,55 @@
+# Python cache and bytecode
 __pycache__
+*.py[cod]
+*$py.class
 *.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
 .venv
+.venv/
+venv/
+env/
+ENV/
+
+# Environment files
 .env
+.env.*
+!.env.example
+
+# Development files
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.python-version
+*.egg-info/
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation and CI
+*.md
+!README.md
+.pre-commit-config.yaml
+
+# Application storage (user data)
+storage/
 storage
+
+# Testing
+tests/
+pytest.ini
+.coverage
