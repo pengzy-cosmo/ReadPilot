@@ -29,6 +29,7 @@ export interface PdfSidebarProps {
 	// Outline
 	outlineItems: OutlineNode[];
 	selectedOutlineId: string | null;
+	activeOutlineId: string | null;
 	onOutlineClick: (item: OutlineNode) => void;
 	onOutlineSelectRange: (item: OutlineNode) => void;
 
@@ -69,7 +70,7 @@ function ThumbnailItem({ pageNumber, pdf, isSelected, isCurrent, onSelect }: Thu
 			className={cn(
 				"group w-full rounded-lg border p-2 text-left transition-all duration-200 relative overflow-hidden",
 				isSelected ? "border-primary/50 bg-primary/5 shadow-sm" : "border-transparent hover:bg-muted/50",
-				isCurrent && "ring-2 ring-primary ring-offset-1",
+				isCurrent && "ring-2 ring-blue-500/80 ring-offset-1",
 			)}
 			onClick={(event) => onSelect(pageNumber, event.shiftKey)}
 			title={`Select page ${pageNumber}`}
@@ -92,26 +93,37 @@ interface OutlineTreeProps {
 	items: OutlineNode[];
 	level?: number;
 	selectedOutlineId: string | null;
+	activeOutlineId: string | null;
 	onOutlineClick: (item: OutlineNode) => void;
 	onOutlineSelectRange: (item: OutlineNode) => void;
 }
 
-function OutlineTree({ items, level = 0, selectedOutlineId, onOutlineClick, onOutlineSelectRange }: OutlineTreeProps) {
+function OutlineTree({
+	items,
+	level = 0,
+	selectedOutlineId,
+	activeOutlineId,
+	onOutlineClick,
+	onOutlineSelectRange,
+}: OutlineTreeProps) {
 	if (!items.length) return null;
 
 	return (
 		<ul className={cn("space-y-0.5", level > 0 && "ml-3 border-l border-border/40 pl-2")}>
 			{items.map((item) => {
 				const isSelected = selectedOutlineId === item.id;
+				const isActive = activeOutlineId === item.id;
 				return (
 					<li key={item.id}>
 						{/* biome-ignore lint/a11y/useSemanticElements: div+role avoids nested <button> hydration error from inner Button component */}
 						<div
 							className={cn(
-								"group w-full flex items-center gap-2 rounded-sm px-2 py-1.5 transition-colors text-sm cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring",
+								"group w-full flex items-center gap-2 rounded-sm px-2 py-1.5 transition-colors text-sm cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring relative",
 								isSelected
 									? "bg-primary/10 text-primary font-medium"
-									: "hover:bg-muted text-muted-foreground hover:text-foreground",
+									: isActive
+										? "text-foreground font-medium bg-muted/40"
+										: "hover:bg-muted text-muted-foreground hover:text-foreground",
 							)}
 							role="button"
 							tabIndex={0}
@@ -142,12 +154,16 @@ function OutlineTree({ items, level = 0, selectedOutlineId, onOutlineClick, onOu
 									<BrainCircuit className="h-3 w-3" />
 								</Button>
 							)}
+							{isActive && !isSelected && (
+								<div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-1/2 bg-primary/40 rounded-r-full" />
+							)}
 						</div>
 						{item.items && item.items.length > 0 && (
 							<OutlineTree
 								items={item.items}
 								level={level + 1}
 								selectedOutlineId={selectedOutlineId}
+								activeOutlineId={activeOutlineId}
 								onOutlineClick={onOutlineClick}
 								onOutlineSelectRange={onOutlineSelectRange}
 							/>
@@ -169,6 +185,7 @@ function PdfSidebarComponent({
 	hasOutline,
 	outlineItems,
 	selectedOutlineId,
+	activeOutlineId,
 	onOutlineClick,
 	onOutlineSelectRange,
 	numPages,
@@ -184,14 +201,15 @@ function PdfSidebarComponent({
 
 	// Auto-scroll thumbnail list to keep current page visible
 	useEffect(() => {
-		if (sidebarTab === "thumbnails" && currentPage > 0) {
+		if (sidebarTab === "thumbnails" && currentPage > 0 && numPages > 0) {
+			const targetIndex = Math.max(0, Math.min(currentPage - 1, numPages - 1));
 			thumbnailListRef.current?.scrollToIndex({
-				index: currentPage - 1,
+				index: targetIndex,
 				align: "center",
 				behavior: "smooth",
 			});
 		}
-	}, [currentPage, sidebarTab]);
+	}, [currentPage, sidebarTab, numPages]);
 
 	return (
 		<>
@@ -241,6 +259,7 @@ function PdfSidebarComponent({
 							<OutlineTree
 								items={outlineItems}
 								selectedOutlineId={selectedOutlineId}
+								activeOutlineId={activeOutlineId}
 								onOutlineClick={onOutlineClick}
 								onOutlineSelectRange={onOutlineSelectRange}
 							/>
@@ -256,7 +275,7 @@ function PdfSidebarComponent({
 						ref={thumbnailListRef}
 						style={{ height: "100%" }}
 						totalCount={numPages}
-						initialTopMostItemIndex={Math.max(0, currentPage - 1)}
+						initialTopMostItemIndex={Math.max(0, Math.min(currentPage - 1, numPages - 1))}
 						itemContent={(index) => {
 							const page = index + 1;
 							return (

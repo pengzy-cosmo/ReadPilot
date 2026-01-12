@@ -174,6 +174,8 @@ export function PdfViewer({
 	const [hasOutline, setHasOutline] = useState(false);
 	const [outlineItems, setOutlineItems] = useState<OutlineNode[]>([]);
 	const [selectedOutlineId, setSelectedOutlineId] = useState<string | null>(null);
+	const [activeOutlineId, setActiveOutlineId] = useState<string | null>(null);
+	const [outlinePageMap, setOutlinePageMap] = useState<Map<string, number>>(new Map());
 	const [thumbnailAnchor, setThumbnailAnchor] = useState<number | null>(null);
 
 	// Zoom state
@@ -717,6 +719,37 @@ export function PdfViewer({
 		return resolved;
 	}, [outlineItems, resolveDestPageNumber]);
 
+	/** Resolve all outline items to page numbers for active highlighting. */
+	const resolveAllOutlinePages = useCallback(
+		async (items: OutlineNode[]) => {
+			const flat = flattenOutline(items);
+			const map = new Map<string, number>();
+			for (const item of flat) {
+				const page = await resolveDestPageNumber(item.dest);
+				if (page) map.set(item.id, page);
+			}
+			setOutlinePageMap(map);
+		},
+		[resolveDestPageNumber],
+	);
+
+	// Update active outline ID based on current page
+	useEffect(() => {
+		if (outlinePageMap.size === 0) {
+			setActiveOutlineId(null);
+			return;
+		}
+		let bestId: string | null = null;
+		let maxPage = -1;
+		for (const [id, page] of outlinePageMap.entries()) {
+			if (page <= currentPage && page > maxPage) {
+				maxPage = page;
+				bestId = id;
+			}
+		}
+		setActiveOutlineId(bestId);
+	}, [currentPage, outlinePageMap]);
+
 	/** Handle outline item click - navigate to page with optional Y offset. */
 	const handleOutlineClick = useCallback(
 		async (item: OutlineNode) => {
@@ -1021,6 +1054,7 @@ export function PdfViewer({
 					setSidebarTab("outline");
 					hadOutlineRef.current = true;
 				}
+				if (normalized.length > 0) void resolveAllOutlinePages(normalized);
 				if (normalized.length === 0) hadOutlineRef.current = false;
 				outlinePageCacheRef.current.clear();
 			} catch (error) {
@@ -1036,7 +1070,7 @@ export function PdfViewer({
 		return () => {
 			cancelled = true;
 		};
-	}, [pdfDoc]);
+	}, [pdfDoc, resolveAllOutlinePages]);
 
 	// Load base page size for scaling calculations
 	useEffect(() => {
@@ -1130,6 +1164,7 @@ export function PdfViewer({
 							hasOutline={hasOutline}
 							outlineItems={outlineItems}
 							selectedOutlineId={selectedOutlineId}
+							activeOutlineId={activeOutlineId}
 							onOutlineClick={(item) => void handleOutlineClick(item)}
 							onOutlineSelectRange={(item) => void handleOutlineSelectRange(item)}
 							numPages={numPages}
