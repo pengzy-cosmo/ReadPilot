@@ -48,8 +48,8 @@ async def chat(request: ChatRequest):
         )
 
         async def generate():
-            # Accumulate streamed chunks to persist the full assistant reply.
-            full_content = ""
+            # Use list for efficient accumulation, then join at the end.
+            chunks: list[str] = []
             try:
                 async for chunk in chat_with_pdf(
                     pdf_base64=pdf_base64,
@@ -61,21 +61,22 @@ async def chat(request: ChatRequest):
                     base_url=request.base_url,
                     model=request.model,
                 ):
-                    full_content += chunk
+                    chunks.append(chunk)
                     yield chunk
             except LLMError as e:
                 # Yield error message as part of the stream so frontend can display it
                 error_msg = f"\n\n**Error:** {e}"
-                full_content += error_msg
+                chunks.append(error_msg)
                 yield error_msg
             except Exception as e:
                 # Catch any unexpected errors
                 error_msg = f"\n\n**Error:** An unexpected error occurred: {e}"
-                full_content += error_msg
+                chunks.append(error_msg)
                 yield error_msg
 
-            # Only save assistant message if we got content (even if it's an error)
-            if full_content:
+            # Save only when stream completes (not on client disconnect)
+            if chunks:
+                full_content = "".join(chunks)
                 await run_in_threadpool(
                     library_service.append_message,
                     request.session_id,

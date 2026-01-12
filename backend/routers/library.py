@@ -86,13 +86,13 @@ async def import_document(file: UploadFile = File(...)):
 
 
 @router.get("/library", response_model=list[DocumentInfo])
-async def list_documents(limit: int = Query(20, ge=1, le=1000)):
+def list_documents(limit: int = Query(20, ge=1, le=1000)):
     """List recent documents ordered by last opened time."""
-    return library_service.list_documents(limit=limit)
+    return library_service.list_documents(limit)
 
 
 @router.get("/library/{doc_id}", response_model=DocumentInfo)
-async def get_document(doc_id: str):
+def get_document(doc_id: str):
     """Fetch document metadata by ID."""
     doc = library_service.get_document(doc_id)
     if doc is None:
@@ -101,7 +101,7 @@ async def get_document(doc_id: str):
 
 
 @router.patch("/library/{doc_id}/state", response_model=DocumentInfo)
-async def update_document_state(doc_id: str, patch: DocumentStateUpdate):
+def update_document_state(doc_id: str, patch: DocumentStateUpdate):
     """Persist viewer state (page, range, session) for a document."""
     updated = library_service.update_document_state(
         doc_id,
@@ -160,7 +160,7 @@ async def get_document_file(doc_id: str, request: Request):
 
 
 @router.delete("/library/{doc_id}")
-async def delete_document(doc_id: str):
+def delete_document(doc_id: str):
     """Delete a document and all associated data."""
     success = library_service.delete_document(doc_id)
     if not success:

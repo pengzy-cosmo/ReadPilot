@@ -53,6 +53,9 @@ class LibraryService:
     def _init_db(self) -> None:
         """Create tables and indexes if they don't exist."""
         with self._get_conn() as conn:
+            # Enable WAL mode for better concurrent read/write performance.
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA synchronous=NORMAL")
             conn.executescript(
                 """
                 CREATE TABLE IF NOT EXISTS documents (
