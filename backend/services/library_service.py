@@ -7,9 +7,11 @@ import os
 import sqlite3
 import time
 import uuid
+from io import BytesIO
 from pathlib import Path
 
-import pymupdf
+from pypdf import PdfReader, PdfWriter
+from pypdf.generic import Destination
 from starlette.concurrency import run_in_threadpool
 
 from models.schemas import DocumentInfo, MessageInfo, OutlineItem, SessionInfo
@@ -174,15 +176,15 @@ class LibraryService:
                 return self._row_to_document(row)
 
         # Parse PDF metadata and outline once to populate DB.
-        doc = pymupdf.open(stream=file_content, filetype="pdf")
-        try:
-            total_pages = doc.page_count
-            metadata = doc.metadata or {}
-            title = metadata.get("title") or None
-            toc = doc.get_toc()
-            outline = [OutlineItem(level=level, title=item_title, page=page) for level, item_title, page in toc]
-        finally:
-            doc.close()
+        reader = PdfReader(BytesIO(file_content))
+        total_pages = len(reader.pages)
+        metadata = reader.metadata or {}
+        title = None
+        if metadata:
+            title = getattr(metadata, "title", None)
+            if not title and hasattr(metadata, "get"):
+                title = metadata.get("/Title") or metadata.get("Title")
+        outline = self._extract_outline(reader)
 
         range_start = 1
         range_end = min(DEFAULT_RANGE_END, total_pages)
@@ -407,18 +409,49 @@ class LibraryService:
         if not file_path.exists():
             return None
 
-        doc = pymupdf.open(file_path)
+        with file_path.open("rb") as file_obj:
+            reader = PdfReader(file_obj)
+            total_pages = len(reader.pages)
+            if total_pages == 0:
+                return None
+            # Convert 1-based page numbers into 0-based indices.
+            from_page = min(total_pages - 1, max(0, start_page - 1))
+            to_page = min(total_pages - 1, max(from_page, end_page - 1))
+            writer = PdfWriter()
+            writer.append(reader, pages=(from_page, to_page + 1))
+            output = BytesIO()
+            writer.write(output)
+            return output.getvalue()
+
+    def _extract_outline(self, reader: PdfReader) -> list[OutlineItem]:
+        """Flatten outline entries with 1-based page numbers."""
+        outline_items: list[OutlineItem] = []
+
+        def walk(items: list[object], level: int) -> None:
+            for item in items:
+                if isinstance(item, list):
+                    walk(item, level + 1)
+                    continue
+                if not isinstance(item, Destination):
+                    continue
+                page_number = reader.get_destination_page_number(item)
+                if page_number is None:
+                    continue
+                title = item.title or "Untitled"
+                outline_items.append(
+                    OutlineItem(
+                        level=level,
+                        title=title,
+                        page=page_number + 1,
+                    )
+                )
+
         try:
-            # Convert 1-based page numbers into PyMuPDF's 0-based indices.
-            from_page = max(0, start_page - 1)
-            to_page = min(doc.page_count - 1, end_page - 1)
-            output = pymupdf.open()
-            output.insert_pdf(doc, from_page=from_page, to_page=to_page)
-            result = output.tobytes()
-            output.close()
-            return result
-        finally:
-            doc.close()
+            outline = reader.outline
+        except Exception:
+            return []
+        walk(outline, 1)
+        return outline_items
 
     async def extract_pages(self, doc_id: str, start_page: int, end_page: int) -> bytes | None:
         """Async wrapper for extracting a page range."""
