@@ -1,9 +1,9 @@
 /** PdfSidebar - Sidebar with outline tree and thumbnail navigation. */
 import { BrainCircuit, Menu, X } from "lucide-react";
 import type { PDFDocumentProxy } from "pdfjs-dist/types/src/display/api";
-import { memo } from "react";
+import { memo, useEffect, useRef } from "react";
 import { Thumbnail } from "react-pdf";
-import { Virtuoso } from "react-virtuoso";
+import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -179,6 +179,20 @@ function PdfSidebarComponent({
 	onThumbnailSelect,
 	onClose,
 }: PdfSidebarProps) {
+	// Ref for programmatic scrolling of thumbnail list
+	const thumbnailListRef = useRef<VirtuosoHandle>(null);
+
+	// Auto-scroll thumbnail list to keep current page visible
+	useEffect(() => {
+		if (sidebarTab === "thumbnails" && currentPage > 0) {
+			thumbnailListRef.current?.scrollToIndex({
+				index: currentPage - 1,
+				align: "center",
+				behavior: "smooth",
+			});
+		}
+	}, [currentPage, sidebarTab]);
+
 	return (
 		<>
 			{/* Header with tabs */}
@@ -239,8 +253,10 @@ function PdfSidebarComponent({
 					)
 				) : (
 					<Virtuoso
+						ref={thumbnailListRef}
 						style={{ height: "100%" }}
 						totalCount={numPages}
+						initialTopMostItemIndex={Math.max(0, currentPage - 1)}
 						itemContent={(index) => {
 							const page = index + 1;
 							return (
