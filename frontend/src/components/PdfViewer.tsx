@@ -217,6 +217,7 @@ export function PdfViewer({
 
 	// Caches for performance
 	const outlinePageCacheRef = useRef<Map<string, number>>(new Map());
+	const outlineResolveTokenRef = useRef(0);
 	const textCacheRef = useRef<Map<number, string[]>>(new Map());
 	const pageHitCounterRef = useRef<Map<number, number>>(new Map());
 
@@ -719,20 +720,6 @@ export function PdfViewer({
 		return resolved;
 	}, [outlineItems, resolveDestPageNumber]);
 
-	/** Resolve all outline items to page numbers for active highlighting. */
-	const resolveAllOutlinePages = useCallback(
-		async (items: OutlineNode[]) => {
-			const flat = flattenOutline(items);
-			const map = new Map<string, number>();
-			for (const item of flat) {
-				const page = await resolveDestPageNumber(item.dest);
-				if (page) map.set(item.id, page);
-			}
-			setOutlinePageMap(map);
-		},
-		[resolveDestPageNumber],
-	);
-
 	// Update active outline ID based on current page
 	useEffect(() => {
 		if (outlinePageMap.size === 0) {
@@ -1043,6 +1030,12 @@ export function PdfViewer({
 	useEffect(() => {
 		if (!pdfDoc) return;
 		let cancelled = false;
+		outlineResolveTokenRef.current += 1;
+		const resolveToken = outlineResolveTokenRef.current;
+		// Reset active highlighting state for new doc
+		setOutlinePageMap(new Map());
+		setActiveOutlineId(null);
+
 		const loadOutline = async () => {
 			try {
 				const outline = await pdfDoc.getOutline();
@@ -1054,7 +1047,32 @@ export function PdfViewer({
 					setSidebarTab("outline");
 					hadOutlineRef.current = true;
 				}
-				if (normalized.length > 0) void resolveAllOutlinePages(normalized);
+
+				// Optimized parallel page resolution
+				if (normalized.length > 0) {
+					const flat = flattenOutline(normalized);
+					// Filter out external links first to save processing
+					const internalItems = flat.filter((item) => !item.url && item.dest);
+
+					// Parallel resolve with isolated failures
+					const results = await Promise.allSettled(
+						internalItems.map(async (item) => {
+							const page = await resolveDestPageNumber(item.dest);
+							return page ? { id: item.id, page } : null;
+						}),
+					);
+
+					if (cancelled || resolveToken !== outlineResolveTokenRef.current) return;
+
+					const map = new Map<string, number>();
+					for (const res of results) {
+						if (res.status === "fulfilled" && res.value) {
+							map.set(res.value.id, res.value.page);
+						}
+					}
+					setOutlinePageMap(map);
+				}
+
 				if (normalized.length === 0) hadOutlineRef.current = false;
 				outlinePageCacheRef.current.clear();
 			} catch (error) {
@@ -1070,7 +1088,7 @@ export function PdfViewer({
 		return () => {
 			cancelled = true;
 		};
-	}, [pdfDoc, resolveAllOutlinePages]);
+	}, [pdfDoc, resolveDestPageNumber]);
 
 	// Load base page size for scaling calculations
 	useEffect(() => {
