@@ -35,6 +35,7 @@ function App() {
 	const [docInfo, setDocInfo] = useState<DocumentInfo | null>(null);
 	const [fileUrl, setFileUrl] = useState<string | null>(null);
 	const [isUploading, setIsUploading] = useState(false);
+	const [initialLoading, setInitialLoading] = useState(true);
 	const [pageRange, setPageRange] = useState({ start: 1, end: 7 });
 	const [currentPage, setCurrentPage] = useState(1);
 	const [initialPage, setInitialPage] = useState(1);
@@ -51,6 +52,7 @@ function App() {
 	const fileInputRef = useRef<HTMLInputElement | null>(null);
 	const messageCountRef = useRef(0);
 	const sessionRef = useRef<string | null>(null);
+	const userSelectedRef = useRef(false);
 
 	const { messages, isLoading, streamingContent, streamingMeta, sendMessage, replaceMessages } = useChat(apiConfig);
 
@@ -127,8 +129,36 @@ function App() {
 		[replaceMessages],
 	);
 
+	// Auto-load the most recent document on startup
+	useEffect(() => {
+		let cancelled = false;
+		const loadRecent = async () => {
+			try {
+				const docs = await listDocuments(1);
+				if (cancelled || userSelectedRef.current) return;
+				if (docs.length > 0) {
+					// Open the most recently accessed document
+					const info = await getDocument(docs[0].doc_id);
+					if (cancelled || userSelectedRef.current) return;
+					applyDocumentState(info);
+					await ensureSessionForDoc(info);
+					await refreshRecentDocs();
+				}
+			} catch (error) {
+				console.error("Failed to load recent document:", error);
+			} finally {
+				if (!cancelled) setInitialLoading(false);
+			}
+		};
+		void loadRecent();
+		return () => {
+			cancelled = true;
+		};
+	}, [applyDocumentState, ensureSessionForDoc, refreshRecentDocs]);
+
 	const openDocumentById = useCallback(
 		async (nextDocId: string) => {
+			userSelectedRef.current = true;
 			setIsUploading(true);
 			try {
 				const info = await getDocument(nextDocId);
@@ -147,6 +177,7 @@ function App() {
 
 	const importAndOpen = useCallback(
 		async (file: File) => {
+			userSelectedRef.current = true;
 			setIsUploading(true);
 			try {
 				const info = await importDocument(file);
@@ -351,7 +382,7 @@ function App() {
 			<div className="h-14 shrink-0" />
 
 			{!docId ? (
-				<UploadZone onFileSelect={handleZoneSelect} isUploading={isUploading} />
+				<UploadZone onFileSelect={handleZoneSelect} isUploading={isUploading || initialLoading} />
 			) : (
 				<Group orientation="horizontal" style={{ flex: 1, overflow: "hidden" }} className="min-w-0">
 					<Panel defaultSize={75} minSize={20} className="bg-muted/30">
