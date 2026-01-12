@@ -507,6 +507,10 @@ function App() {
 					setShowBookshelf(false);
 					void handleOpenRecent(nextDocId);
 				}}
+				onImportClick={() => {
+					setShowBookshelf(false);
+					handleRequestOpenFile();
+				}}
 				onDelete={handleDeleteDocument}
 			/>
 			<SessionListModal

@@ -1,5 +1,5 @@
 /** BookshelfModal - Modal listing recent documents for quick access. */
-import { BookOpen, Trash2, X } from "lucide-react";
+import { BookOpen, FolderOpen, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +12,7 @@ interface BookshelfModalProps {
 	onClose: () => void;
 	documents: DocumentInfo[];
 	onOpenDocument: (docId: string) => void;
+	onImportClick: () => void;
 	onDelete: (docId: string) => void;
 }
 
@@ -28,7 +29,14 @@ const formatTimestamp = (value?: number) => {
 	return new Date(value).toLocaleString();
 };
 
-export function BookshelfModal({ isOpen, onClose, documents, onOpenDocument, onDelete }: BookshelfModalProps) {
+export function BookshelfModal({
+	isOpen,
+	onClose,
+	documents,
+	onOpenDocument,
+	onImportClick,
+	onDelete,
+}: BookshelfModalProps) {
 	if (!isOpen) return null;
 
 	const totalSize = documents.reduce((acc, doc) => acc + doc.file_size, 0);
@@ -61,10 +69,17 @@ export function BookshelfModal({ isOpen, onClose, documents, onOpenDocument, onD
 							</p>
 						</div>
 					</div>
-					<Button variant="ghost" size="icon" onClick={onClose}>
-						<X className="size-4" />
-						<span className="sr-only">Close</span>
-					</Button>
+					<div className="flex items-center gap-1">
+						<Button variant="outline" size="sm" className="h-8 gap-2" onClick={onImportClick}>
+							<FolderOpen className="size-3.5" />
+							<span className="hidden sm:inline">Open PDF</span>
+							<span className="sm:hidden">Open</span>
+						</Button>
+						<Button variant="ghost" size="icon" onClick={onClose}>
+							<X className="size-4" />
+							<span className="sr-only">Close</span>
+						</Button>
+					</div>
 				</CardHeader>
 				<CardContent className="flex-1 min-h-0 p-0">
 					<ScrollArea className="h-full">
