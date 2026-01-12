@@ -105,24 +105,32 @@ function OutlineTree({ items, level = 0, selectedOutlineId, onOutlineClick, onOu
 				const isSelected = selectedOutlineId === item.id;
 				return (
 					<li key={item.id}>
-						<button
-							type="button"
+						{/* biome-ignore lint/a11y/useSemanticElements: div+role avoids nested <button> hydration error from inner Button component */}
+						<div
 							className={cn(
-								"group w-full flex items-center gap-2 rounded-sm px-2 py-1.5 transition-colors cursor-pointer text-sm text-left",
+								"group w-full flex items-center gap-2 rounded-sm px-2 py-1.5 transition-colors text-sm cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring",
 								isSelected
 									? "bg-primary/10 text-primary font-medium"
 									: "hover:bg-muted text-muted-foreground hover:text-foreground",
 							)}
+							role="button"
+							tabIndex={0}
 							onClick={() => onOutlineClick(item)}
+							onKeyDown={(e) => {
+								if (e.key === "Enter" || e.key === " ") {
+									e.preventDefault();
+									onOutlineClick(item);
+								}
+							}}
 						>
-							<span className="flex-1 truncate">{item.title || "Untitled"}</span>
+							<span className="flex-1 truncate text-left select-none">{item.title || "Untitled"}</span>
 							{/* Focus context button - only for internal links */}
 							{!item.url && (
 								<Button
 									variant="ghost"
 									size="icon"
 									className={cn(
-										"h-5 w-5 opacity-0 group-hover:opacity-100 transition-all scale-90 hover:scale-100",
+										"h-5 w-5 opacity-0 group-hover:opacity-100 transition-all scale-90 hover:scale-100 shrink-0",
 										isSelected && "opacity-100 text-primary bg-background shadow-sm",
 									)}
 									onClick={(event) => {
@@ -134,7 +142,7 @@ function OutlineTree({ items, level = 0, selectedOutlineId, onOutlineClick, onOu
 									<BrainCircuit className="h-3 w-3" />
 								</Button>
 							)}
-						</button>
+						</div>
 						{item.items && item.items.length > 0 && (
 							<OutlineTree
 								items={item.items}

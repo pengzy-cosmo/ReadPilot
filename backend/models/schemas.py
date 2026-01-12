@@ -21,6 +21,7 @@ class BookContext(BaseModel):
     selected_range: str | None = None  # e.g., "5-10"
     outline: str | None = None  # Table of contents as text
     overview: str | None = None  # User/AI generated overview
+    highlights: list[str] | None = None  # User-selected text passages for focused context
 
 
 class ChatRequest(BaseModel):

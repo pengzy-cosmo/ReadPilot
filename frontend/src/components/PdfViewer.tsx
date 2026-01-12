@@ -13,6 +13,7 @@ import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 
 import { type OutlineNode, PdfSidebar } from "@/components/PdfSidebar";
 import { PdfToolbar } from "@/components/PdfToolbar";
+import { TextSelectionPopup } from "@/components/TextSelectionPopup";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -36,6 +37,8 @@ export interface PdfViewerProps {
 	pageRange: { start: number; end: number };
 	onPageRangeChange: (range: { start: number; end: number }) => void;
 	onCurrentPageChange?: (page: number) => void;
+	onTextSelect?: (text: string) => void;
+	onExplainText?: (text: string) => void;
 	initialPage?: number;
 	autoFollow?: boolean;
 	contextWindow?: number;
@@ -144,6 +147,8 @@ export function PdfViewer({
 	pageRange,
 	onPageRangeChange,
 	onCurrentPageChange,
+	onTextSelect,
+	onExplainText,
 	initialPage,
 	autoFollow = true,
 	contextWindow = 3,
@@ -1259,6 +1264,14 @@ export function PdfViewer({
 										}}
 									/>
 								</Document>
+								{onTextSelect && (
+									<TextSelectionPopup
+										containerRef={containerRef}
+										onAddSelection={onTextSelect}
+										onExplainSelection={onExplainText}
+										maxLength={2000}
+									/>
+								)}
 							</div>
 						) : (
 							/* Empty State */

@@ -5,7 +5,7 @@ import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import "katex/dist/katex.min.css";
-import { Bot, History, Loader2, Plus, SendHorizontal, Sparkles, Trash2, User } from "lucide-react";
+import { Bot, History, Loader2, Plus, Quote, SendHorizontal, Sparkles, Trash2, User, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -27,6 +27,8 @@ interface ChatPanelProps {
 	sessionTitle?: string | null;
 	sessionSubtitle?: string | null;
 	pageRange?: { start: number; end: number } | null;
+	selectedTexts?: string[];
+	onRemoveSelection?: (index: number) => void;
 	messages: Message[];
 	isLoading: boolean;
 	streamingContent: string;
@@ -43,6 +45,8 @@ export function ChatPanel({
 	sessionTitle,
 	sessionSubtitle,
 	pageRange,
+	selectedTexts = [],
+	onRemoveSelection,
 	messages,
 	isLoading,
 	streamingContent,
@@ -308,23 +312,47 @@ export function ChatPanel({
 
 			<div className="p-4 bg-background border-t border-border/40">
 				<div className="relative max-w-3xl mx-auto">
+					{/* Selected highlights display - Removed old bulky list */}
 					<form
 						onSubmit={handleSubmit}
 						className="relative flex items-end gap-2 rounded-2xl border border-input bg-muted/20 shadow-sm focus-within:ring-1 focus-within:ring-ring transition-all hover:bg-muted/30"
 					>
-						{!disabled && pageRange && (
-							<span
-								className="pointer-events-none absolute left-3 top-0 -translate-y-1/2 rounded-full border border-border/60 bg-background px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
-								title="Current context page range"
-							>
-								{formatContextRange(pageRange)}
-							</span>
+						{!disabled && (
+							<div className="absolute left-3 top-0 -translate-y-1/2 flex items-center gap-2 max-w-[calc(100%-24px)] pointer-events-none">
+								{pageRange && (
+									<span
+										className="shrink-0 rounded-full border border-border/60 bg-background px-2 py-0.5 text-[10px] font-medium text-muted-foreground shadow-sm"
+										title="Current context page range"
+									>
+										{formatContextRange(pageRange)}
+									</span>
+								)}
+								{selectedTexts.map((text, index) => (
+									<div
+										key={text}
+										className="pointer-events-auto flex items-center gap-1 shrink-0 rounded-full border border-primary/20 bg-primary/5 px-2 py-0.5 text-[10px] font-medium text-primary shadow-sm animate-in fade-in zoom-in-95 duration-200 group hover:bg-primary/10 transition-colors cursor-default max-w-[120px]"
+										title={text}
+									>
+										<Quote className="size-2.5 opacity-50" />
+										<span className="truncate">{text}</span>
+										{onRemoveSelection && (
+											<button
+												type="button"
+												onClick={() => onRemoveSelection(index)}
+												className="ml-0.5 rounded-full p-0.5 hover:bg-destructive/20 hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"
+											>
+												<X className="size-2.5" />
+											</button>
+										)}
+									</div>
+								))}
+							</div>
 						)}
 						<Textarea
 							value={input}
 							onChange={(event) => setInput(event.target.value)}
 							onKeyDown={handleKeyDown}
-							placeholder="Ask anything..."
+							placeholder={selectedTexts.length > 0 ? "Ask about the highlighted text..." : "Ask anything..."}
 							disabled={disabled || isLoading}
 							className="resize-none min-h-[50px] max-h-[200px] border-0 focus-visible:ring-0 bg-transparent py-3.5 pl-4 pr-12 shadow-none scrollbar-hide"
 							rows={1}

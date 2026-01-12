@@ -19,6 +19,7 @@ export interface BookContext {
 	selectedRange?: string;
 	outline?: string;
 	overview?: string;
+	highlights?: string[]; // User-selected text passages for focused context
 }
 
 interface ApiConfig {
@@ -120,6 +121,7 @@ export function useChat(apiConfig: ApiConfig) {
 									selected_range: bookContext.selectedRange,
 									outline: bookContext.outline,
 									overview: bookContext.overview,
+									highlights: bookContext.highlights,
 								}
 							: undefined,
 						api_key: apiConfig.apiKey || undefined,

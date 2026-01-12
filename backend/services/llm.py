@@ -16,7 +16,8 @@ Guidelines:
 - Be concise but thorough
 - If the answer is not in the provided pages, say so and suggest which pages might contain the information
 - Use markdown formatting for better readability
-- When summarizing, highlight key points and main ideas"""
+- When summarizing, highlight key points and main ideas
+- When the user provides highlighted text passages, pay special attention to those excerpts as they indicate the user's focus of interest"""
 
     if not book_context:
         return base_prompt
@@ -94,6 +95,18 @@ async def chat_with_pdf(
     if user_context_parts:
         context_text = "Context: " + ", ".join(user_context_parts) + ". The attached PDF contains the selected pages."
 
+    # Build highlighted text section for user message
+    highlights_text = None
+    if context_dict:
+        highlights = context_dict.get("highlights")
+        if highlights and len(highlights) > 0:
+            highlight_parts = ["I've highlighted the following passages that are relevant to my question:"]
+            for i, highlight in enumerate(highlights, 1):
+                # Truncate very long highlights
+                text = highlight[:2000] + "..." if len(highlight) > 2000 else highlight
+                highlight_parts.append(f"\n[Highlight {i}]:\n{text}")
+            highlights_text = "\n".join(highlight_parts)
+
     messages.append(
         {
             "role": "user",
@@ -106,6 +119,7 @@ async def chat_with_pdf(
                         "file_data": f"data:application/pdf;base64,{pdf_base64}",
                     },
                 },
+                *([{"type": "text", "text": highlights_text}] if highlights_text else []),
                 {
                     "type": "text",
                     "text": question,

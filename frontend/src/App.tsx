@@ -49,6 +49,7 @@ function App() {
 	const [bookshelfDocs, setBookshelfDocs] = useState<DocumentInfo[]>([]);
 	const [showSessions, setShowSessions] = useState(false);
 	const [sessionList, setSessionList] = useState<SessionInfo[]>([]);
+	const [selectedTexts, setSelectedTexts] = useState<string[]>([]);
 	const fileInputRef = useRef<HTMLInputElement | null>(null);
 	const messageCountRef = useRef(0);
 	const sessionRef = useRef<string | null>(null);
@@ -284,8 +285,27 @@ function App() {
 			currentPage,
 			selectedRange: `${pageRange.start}-${pageRange.end}`,
 			outline,
+			highlights: selectedTexts.length > 0 ? selectedTexts : undefined,
 		};
-	}, [docInfo, currentPage, pageRange, outline]);
+	}, [docInfo, currentPage, pageRange, outline, selectedTexts]);
+
+	const handleAddSelection = useCallback((text: string) => {
+		setSelectedTexts((prev) => {
+			// Limit to 5 highlights max
+			if (prev.length >= 5) {
+				return prev;
+			}
+			// Avoid duplicates
+			if (prev.includes(text)) {
+				return prev;
+			}
+			return [...prev, text];
+		});
+	}, []);
+
+	const handleRemoveSelection = useCallback((index: number) => {
+		setSelectedTexts((prev) => prev.filter((_, i) => i !== index));
+	}, []);
 
 	const handleRequestOpenFile = useCallback(() => {
 		fileInputRef.current?.click();
@@ -353,8 +373,23 @@ function App() {
 			if (showSessions && docId) {
 				void loadSessionsForDoc(docId);
 			}
+			// Auto-clear highlights after sending to keep context fresh
+			setSelectedTexts([]);
 		},
 		[docId, sessionId, pageRange, sendMessage, getBookContext, showSessions, loadSessionsForDoc],
+	);
+
+	const handleExplainSelection = useCallback(
+		async (text: string) => {
+			if (!docId || !sessionId) return;
+			// Construct a direct question with the quoted text
+			const question = `Please explain the following text:\n\n> ${text}`;
+			// Send immediately. Note: we don't add to selectedTexts state as it's a one-off action.
+			await sendMessage(docId, sessionId, pageRange.start, pageRange.end, question, getBookContext());
+			// Clear any existing selections to avoid confusion
+			setSelectedTexts([]);
+		},
+		[docId, sessionId, pageRange, sendMessage, getBookContext],
 	);
 
 	const handleSummarize = useCallback(() => {
@@ -392,6 +427,8 @@ function App() {
 							pageRange={pageRange}
 							onPageRangeChange={setPageRange}
 							onCurrentPageChange={setCurrentPage}
+							onTextSelect={handleAddSelection}
+							onExplainText={handleExplainSelection}
 							initialPage={initialPage}
 							autoFollow={true}
 							contextWindow={3}
@@ -417,6 +454,8 @@ function App() {
 							sessionTitle={sessionTitle}
 							sessionSubtitle={sessionSubtitle}
 							pageRange={docId ? pageRange : null}
+							selectedTexts={selectedTexts}
+							onRemoveSelection={handleRemoveSelection}
 							messages={messages}
 							isLoading={isLoading}
 							streamingContent={streamingContent}
