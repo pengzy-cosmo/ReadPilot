@@ -64,3 +64,12 @@ async def clear_messages(session_id: str):
         raise HTTPException(status_code=404, detail="Session not found")
     library_service.clear_messages(session_id)
     return {"success": True}
+
+
+@router.delete("/sessions/{session_id}")
+async def delete_session(session_id: str):
+    """Delete a session."""
+    success = library_service.delete_session(session_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"success": True}

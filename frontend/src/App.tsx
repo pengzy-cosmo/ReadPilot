@@ -58,7 +58,7 @@ function App() {
 	const { messages, isLoading, streamingContent, streamingMeta, sendMessage, replaceMessages } = useChat(apiConfig);
 
 	const refreshRecentDocs = useCallback(async () => {
-		const docs = await listDocuments(12);
+		const docs = await listDocuments(100);
 		setBookshelfDocs(docs);
 	}, []);
 
@@ -397,6 +397,39 @@ function App() {
 		handleSendMessage(prompt);
 	}, [pageRange, handleSendMessage]);
 
+	const handleDeleteDocument = useCallback(
+		async (deletedDocId: string) => {
+			await refreshRecentDocs();
+			if (docId === deletedDocId) {
+				setDocId(null);
+				setDocInfo(null);
+				setFileUrl(null);
+				setSessionId(null);
+				setSessionList([]);
+				replaceMessages([]);
+				setOutline(undefined);
+				setSessionTitle(null);
+				setSessionSubtitle(null);
+			}
+		},
+		[docId, refreshRecentDocs, replaceMessages],
+	);
+
+	const handleDeleteSession = useCallback(
+		async (deletedSessionId: string) => {
+			if (docId) {
+				await loadSessionsForDoc(docId);
+			}
+			if (sessionId === deletedSessionId) {
+				setSessionId(null);
+				replaceMessages([]);
+				setSessionTitle(null);
+				setSessionSubtitle(null);
+			}
+		},
+		[docId, sessionId, loadSessionsForDoc, replaceMessages],
+	);
+
 	return (
 		<Layout>
 			<Toaster position="top-center" richColors closeButton />
@@ -474,6 +507,7 @@ function App() {
 					setShowBookshelf(false);
 					void handleOpenRecent(nextDocId);
 				}}
+				onDelete={handleDeleteDocument}
 			/>
 			<SessionListModal
 				isOpen={showSessions}
@@ -483,6 +517,7 @@ function App() {
 				onOpenSession={(nextSessionId) => {
 					void handleOpenSession(nextSessionId);
 				}}
+				onDelete={handleDeleteSession}
 			/>
 			<ApiSettings
 				isOpen={showSettings}

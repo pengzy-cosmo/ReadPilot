@@ -154,6 +154,24 @@ export async function clearMessages(sessionId: string): Promise<void> {
 	}
 }
 
+export async function deleteDocument(docId: string): Promise<void> {
+	const response = await fetch(`${API_URL}/api/library/${docId}`, {
+		method: "DELETE",
+	});
+	if (!response.ok) {
+		throw new Error("Failed to delete document");
+	}
+}
+
+export async function deleteSession(sessionId: string): Promise<void> {
+	const response = await fetch(`${API_URL}/api/sessions/${sessionId}`, {
+		method: "DELETE",
+	});
+	if (!response.ok) {
+		throw new Error("Failed to delete session");
+	}
+}
+
 export function getDocumentFileUrl(docId: string): string {
 	// Direct file streaming endpoint used by react-pdf.
 	return `${API_URL}/api/library/${docId}/file`;

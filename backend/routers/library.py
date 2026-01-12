@@ -86,7 +86,7 @@ async def import_document(file: UploadFile = File(...)):
 
 
 @router.get("/library", response_model=list[DocumentInfo])
-async def list_documents(limit: int = Query(20, ge=1, le=100)):
+async def list_documents(limit: int = Query(20, ge=1, le=1000)):
     """List recent documents ordered by last opened time."""
     return library_service.list_documents(limit=limit)
 
@@ -157,3 +157,12 @@ async def get_document_file(doc_id: str, request: Request):
         media_type="application/pdf",
         headers=headers,
     )
+
+
+@router.delete("/library/{doc_id}")
+async def delete_document(doc_id: str):
+    """Delete a document and all associated data."""
+    success = library_service.delete_document(doc_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return {"success": True}

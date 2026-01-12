@@ -435,5 +435,68 @@ class LibraryService:
             return None
         return await run_in_threadpool(self._encode_base64, pdf_bytes)
 
+    def delete_document(self, doc_id: str) -> bool:
+        """Delete a document and all related data (sessions, messages, file)."""
+        with self._get_conn() as conn:
+            # Check if document exists
+            row = conn.execute("SELECT doc_id FROM documents WHERE doc_id = ?", (doc_id,)).fetchone()
+            if not row:
+                return False
+
+            # Delete file
+            file_path = self._file_path(doc_id)
+            if file_path.exists():
+                try:
+                    file_path.unlink()
+                except OSError as e:
+                    print(f"Error deleting file {file_path}: {e}")
+
+            # Delete DB records
+            # Because we don't have CASCADE delete setup in schema (or foreign keys might be loose),
+            # we should manually clean up to be safe.
+            # 1. Get all sessions for this doc
+            sessions = conn.execute("SELECT session_id FROM sessions WHERE doc_id = ?", (doc_id,)).fetchall()
+            session_ids = [s["session_id"] for s in sessions]
+
+            # 2. Delete messages for these sessions
+            if session_ids:
+                placeholders = ",".join(["?"] * len(session_ids))
+                conn.execute(f"DELETE FROM messages WHERE session_id IN ({placeholders})", session_ids)
+
+            # 3. Delete sessions
+            conn.execute("DELETE FROM sessions WHERE doc_id = ?", (doc_id,))
+
+            # 4. Delete document
+            conn.execute("DELETE FROM documents WHERE doc_id = ?", (doc_id,))
+
+        return True
+
+    def delete_session(self, session_id: str) -> bool:
+        """Delete a session and its messages."""
+        with self._get_conn() as conn:
+            row = conn.execute("SELECT session_id, doc_id FROM sessions WHERE session_id = ?", (session_id,)).fetchone()
+            if not row:
+                return False
+
+            doc_id = row["doc_id"]
+
+            # Delete messages
+            conn.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
+
+            # Delete session
+            conn.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
+
+            # Update document if this was the last session
+            doc_row = conn.execute("SELECT last_session_id FROM documents WHERE doc_id = ?", (doc_id,)).fetchone()
+            if doc_row and doc_row["last_session_id"] == session_id:
+                # Find another session to set as last, or set to NULL
+                recent_session = conn.execute(
+                    "SELECT session_id FROM sessions WHERE doc_id = ? ORDER BY updated_at DESC LIMIT 1", (doc_id,)
+                ).fetchone()
+                new_last_id = recent_session["session_id"] if recent_session else None
+                conn.execute("UPDATE documents SET last_session_id = ? WHERE doc_id = ?", (new_last_id, doc_id))
+
+        return True
+
 
 library_service = LibraryService()
