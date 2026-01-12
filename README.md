@@ -1,39 +1,39 @@
 # ReadPilot
 
-LLM-assisted PDF reader that provides context-aware document interaction by automatically selecting relevant pages based on your current view.
+**ReadPilot** is a self-hosted PDF reader that integrates LLM capabilities directly into your reading workflow.
 
-## Features
+Unlike generic chat-with-PDF tools, ReadPilot **automatically syncs the chat context with your current viewport**. As you scroll, the AI "reads" along with you, allowing for precise questions without manual context management.
 
-- **Context-Aware Chat**: Automatically uses pages around the current viewport as LLM context.
-- **Large PDF Support**: Smooth navigation and reading for large documents.
-- **Integrated Sidebar**: Chat with the document directly while reading.
+## Quick Start (Docker)
 
-## Quick Start
+Requires [Docker Compose](https://docs.docker.com/compose/install/).
 
-### Using Just
+1. **Configure Environment**
 
-```bash
-just install
-just dev
-```
+   Copy the example config and set your OpenAI API key (or compatible provider):
 
-### Using Docker
+   ```bash
+   cp .env.example .env
+   # Edit .env to set OPENAI_API_KEY=sk-...
+   ```
 
-```bash
-docker compose up --build
-```
+2. **Run**
 
-Open <http://localhost:5173> in your browser.
+   ```bash
+   docker compose up --build
+   ```
 
-Optional environment variables (set in `.env` or your shell):
+3. **Open Browser**
+   - App: <http://localhost:5173>
+   - Settings: Click the gear icon in the app to configure models or base URLs.
 
-- `OPENAI_API_KEY`
-- `OPENAI_BASE_URL` (optional)
-- `VITE_API_URL` (optional, defaults to `http://localhost:8000`)
+> Data is persisted in the `readpilot_data` Docker volume.
 
-### Manual Setup
+## Local Development
 
-#### Backend (Python/uv)
+### Backend (Python)
+
+Requires Python 3.13+ and [uv](https://github.com/astral-sh/uv).
 
 ```bash
 cd backend
@@ -41,7 +41,9 @@ uv sync
 uv run uvicorn main:app --reload --port 8000
 ```
 
-#### Frontend (Node.js)
+### Frontend (React)
+
+Requires Node.js 20+.
 
 ```bash
 cd frontend
@@ -49,13 +51,14 @@ npm install
 npm run dev
 ```
 
-- API: <http://localhost:8000>
-- Web: <http://localhost:5173>
-
 ## Configuration
 
-Settings can be managed via the **API Settings** in the UI or environment variables in `backend/.env`:
+| Variable             | Description                               | Default                     |
+| -------------------- | ----------------------------------------- | --------------------------- |
+| `OPENAI_API_KEY`     | API Key for LLM service                   | -                           |
+| `OPENAI_BASE_URL`    | Custom endpoint (e.g. for LocalAI/Ollama) | `https://api.openai.com/v1` |
+| `READPILOT_DATA_DIR` | PDF & Metadata storage path               | `./storage`                 |
 
-- `OPENAI_API_KEY`
-- `OPENAI_BASE_URL` (optional)
-- `MODEL_NAME` (default: gpt-5.2)
+## License
+
+MIT
