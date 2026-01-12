@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import type { Message } from "@/hooks/useChat";
-import { cn } from "@/lib/utils";
+import { cn, preprocessLaTeX } from "@/lib/utils";
 
 interface PageRangeMeta {
 	pageStart: number;
@@ -120,7 +120,7 @@ export function ChatPanel({
 	const renderMarkdown = (content: string, showCaret = false) => (
 		<div className="prose prose-sm dark:prose-invert max-w-none break-words">
 			<ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
-				{content}
+				{preprocessLaTeX(content)}
 			</ReactMarkdown>
 			{showCaret && <span className="animate-pulse inline-block w-1.5 h-3.5 bg-primary ml-0.5 align-middle" />}
 		</div>
