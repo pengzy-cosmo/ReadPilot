@@ -19,18 +19,19 @@ async def chat(request: ChatRequest):
             raise HTTPException(status_code=400, detail="page_start must be <= page_end")
 
         # Validate doc + session ownership early to avoid unnecessary work.
-        doc = library_service.get_document(request.doc_id)
+        doc = await run_in_threadpool(library_service.get_document, request.doc_id)
         if doc is None:
             raise HTTPException(status_code=404, detail="Document not found")
 
-        session = library_service.get_session(request.session_id)
+        session = await run_in_threadpool(library_service.get_session, request.session_id)
         if session is None:
             raise HTTPException(status_code=404, detail="Session not found")
         if session.doc_id != request.doc_id:
             raise HTTPException(status_code=400, detail="Session does not belong to document")
 
         # Extract only the requested page range to keep prompt size manageable.
-        pdf_base64 = await library_service.extract_pages_base64(
+        pdf_base64 = await run_in_threadpool(
+            library_service.extract_pages_base64,
             request.doc_id,
             request.page_start,
             request.page_end,

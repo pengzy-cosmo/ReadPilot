@@ -12,7 +12,6 @@ from pathlib import Path
 
 from pypdf import PdfReader, PdfWriter
 from pypdf.generic import Destination
-from starlette.concurrency import run_in_threadpool
 
 from models.schemas import DocumentInfo, MessageInfo, OutlineItem, SessionInfo
 
@@ -151,8 +150,8 @@ class LibraryService:
             return None
         return path
 
-    def _import_sync(self, file_content: bytes, filename: str) -> DocumentInfo:
-        """Import a PDF and upsert metadata; runs in a threadpool."""
+    def import_pdf(self, file_content: bytes, filename: str) -> DocumentInfo:
+        """Import a PDF file and upsert its metadata in the database."""
         doc_id = hashlib.sha256(file_content).hexdigest()
         file_path = self._file_path(doc_id)
         now = now_ms()
@@ -236,10 +235,6 @@ class LibraryService:
             )
 
         return record
-
-    async def import_pdf(self, file_content: bytes, filename: str) -> DocumentInfo:
-        """Async wrapper for importing a PDF."""
-        return await run_in_threadpool(self._import_sync, file_content, filename)
 
     def list_documents(self, limit: int = 20) -> list[DocumentInfo]:
         """Return recent documents ordered by last opened timestamp."""
@@ -406,8 +401,8 @@ class LibraryService:
                 (now_ms(), session_id),
             )
 
-    def _extract_pages_sync(self, doc_id: str, start_page: int, end_page: int) -> bytes | None:
-        """Extract a page range into a new PDF; runs in a threadpool."""
+    def extract_pages(self, doc_id: str, start_page: int, end_page: int) -> bytes | None:
+        """Extract a page range into a new PDF."""
         file_path = self._file_path(doc_id)
         if not file_path.exists():
             return None
@@ -456,20 +451,12 @@ class LibraryService:
         walk(outline, 1)
         return outline_items
 
-    async def extract_pages(self, doc_id: str, start_page: int, end_page: int) -> bytes | None:
-        """Async wrapper for extracting a page range."""
-        return await run_in_threadpool(self._extract_pages_sync, doc_id, start_page, end_page)
-
-    def _encode_base64(self, pdf_bytes: bytes) -> str:
-        """Base64-encode PDF bytes for OpenAI-compatible file input."""
-        return base64.b64encode(pdf_bytes).decode("utf-8")
-
-    async def extract_pages_base64(self, doc_id: str, start_page: int, end_page: int) -> str | None:
+    def extract_pages_base64(self, doc_id: str, start_page: int, end_page: int) -> str | None:
         """Extract page range and return base64-encoded content."""
-        pdf_bytes = await self.extract_pages(doc_id, start_page, end_page)
+        pdf_bytes = self.extract_pages(doc_id, start_page, end_page)
         if pdf_bytes is None:
             return None
-        return await run_in_threadpool(self._encode_base64, pdf_bytes)
+        return base64.b64encode(pdf_bytes).decode("utf-8")
 
     def delete_document(self, doc_id: str) -> bool:
         """Delete a document and all related data (sessions, messages, file)."""

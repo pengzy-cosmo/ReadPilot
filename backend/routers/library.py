@@ -6,6 +6,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import Response, StreamingResponse
+from starlette.concurrency import run_in_threadpool
 
 from models.schemas import DocumentInfo, DocumentStateUpdate
 from services.library_service import library_service
@@ -80,7 +81,7 @@ async def import_document(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="Empty file")
 
     try:
-        return await library_service.import_pdf(content, file.filename)
+        return await run_in_threadpool(library_service.import_pdf, content, file.filename)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"Failed to import PDF: {exc}") from exc
 
