@@ -173,6 +173,7 @@ export function PdfViewer({
 	const containerRef = useRef<HTMLDivElement | null>(null);
 	const groupRef = useRef<HTMLDivElement | null>(null);
 	const viewerRef = useRef<VirtuosoHandle | null>(null);
+	const scrollerRef = useRef<HTMLElement | null>(null);
 	const searchInputRef = useRef<HTMLInputElement | null>(null);
 	const pdfRef = useRef<PDFDocumentProxy | null>(null);
 	const baseSizeRef = useRef<PageSize | null>(null);
@@ -797,16 +798,48 @@ export function PdfViewer({
 		if (currentPage > 1) scheduleJump(currentPage, 0);
 	}, [currentPage, pageBaseSize, scheduleJump]);
 
-	// Container resize observer
+	// Container resize observer with scroll position preservation
 	useEffect(() => {
 		const target = containerRef.current;
 		if (!target) return;
+		let resizeTimer: number | undefined;
+		let prevWidth = target.clientWidth;
+		let prevHeight = target.clientHeight;
+		// Store scroll ratio before resize
+		let scrollRatio = 0;
+
 		const observer = new ResizeObserver(() => {
 			if (!target) return;
-			setContainerSize({ width: target.clientWidth, height: target.clientHeight });
+			const newWidth = target.clientWidth;
+			const newHeight = target.clientHeight;
+			// Skip if size unchanged
+			if (newWidth === prevWidth && newHeight === prevHeight) return;
+
+			// Capture scroll ratio BEFORE updating size
+			const scroller = scrollerRef.current;
+			if (scroller && scroller.scrollHeight > scroller.clientHeight) {
+				scrollRatio = scroller.scrollTop / (scroller.scrollHeight - scroller.clientHeight);
+			}
+
+			prevWidth = newWidth;
+			prevHeight = newHeight;
+			setContainerSize({ width: newWidth, height: newHeight });
+
+			// Restore scroll position after resize settles
+			window.clearTimeout(resizeTimer);
+			resizeTimer = window.setTimeout(() => {
+				const scroller = scrollerRef.current;
+				if (scroller && scroller.scrollHeight > scroller.clientHeight) {
+					const newScrollTop = scrollRatio * (scroller.scrollHeight - scroller.clientHeight);
+					scroller.scrollTop = newScrollTop;
+				}
+			}, 50);
 		});
 		observer.observe(target);
-		return () => observer.disconnect();
+		return () => {
+			observer.disconnect();
+			window.clearTimeout(resizeTimer);
+		};
 	}, []);
 
 	// Group resize observer for sidebar sizing
@@ -940,6 +973,9 @@ export function PdfViewer({
 									<Virtuoso
 										key={fileKey}
 										ref={viewerRef}
+										scrollerRef={(ref) => {
+											scrollerRef.current = ref as HTMLElement | null;
+										}}
 										style={{ height: "100%", width: "100%" }}
 										totalCount={numPages}
 										initialTopMostItemIndex={Math.max(0, (initialPage ?? 1) - 1)}
