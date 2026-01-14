@@ -6,19 +6,11 @@ import { Thumbnail } from "react-pdf";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 
 import { Button } from "@/components/ui/button";
+import type { OutlineNode } from "@/lib/pdfHelpers";
 import { cn } from "@/lib/utils";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-export type OutlineNode = {
-	id: string;
-	title: string;
-	dest: unknown;
-	url?: string | null;
-	items?: OutlineNode[];
-};
+// Re-export for backward compatibility
+export type { OutlineNode };
 
 export interface PdfSidebarProps {
 	// Tab state
