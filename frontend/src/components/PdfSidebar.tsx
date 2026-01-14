@@ -154,9 +154,9 @@ function OutlineTree({
 								aria-label={isExpanded ? "Collapse section" : "Expand section"}
 							>
 								{isExpanded ? (
-									<ChevronDown className="h-3.5 w-3.5 opacity-50" />
+									<ChevronDown className="h-3.5 w-3.5 opacity-50" aria-hidden="true" />
 								) : (
-									<ChevronRight className="h-3.5 w-3.5 opacity-50" />
+									<ChevronRight className="h-3.5 w-3.5 opacity-50" aria-hidden="true" />
 								)}
 							</button>
 
@@ -174,9 +174,9 @@ function OutlineTree({
 										event.stopPropagation();
 										onOutlineSelectRange(item);
 									}}
-									title="Focus context on this section"
+									aria-label="Focus context on this section"
 								>
-									<BrainCircuit className="h-3 w-3" />
+									<BrainCircuit className="h-3 w-3" aria-hidden="true" />
 								</Button>
 							)}
 							{showActiveIndicator && !isSelected && (
@@ -326,11 +326,16 @@ function PdfSidebarComponent({
 		<>
 			{/* Header with tabs */}
 			<div className="flex items-center justify-between p-3 border-b h-14 bg-background/50 backdrop-blur-sm shrink-0">
-				<div className="flex bg-muted/50 p-1 rounded-lg">
+				<div className="flex bg-muted/50 p-1 rounded-lg" role="tablist">
 					<button
 						type="button"
+						id="tab-outline"
+						role="tab"
+						aria-selected={sidebarTab === "outline"}
+						aria-controls="panel-outline"
+						tabIndex={sidebarTab === "outline" ? 0 : -1}
 						className={cn(
-							"px-3 py-1 text-xs font-medium rounded-md transition-all",
+							"px-3 py-1 text-xs font-medium rounded-md transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 outline-none",
 							sidebarTab === "outline"
 								? "bg-background text-foreground shadow-sm"
 								: "text-muted-foreground hover:text-foreground",
@@ -341,8 +346,13 @@ function PdfSidebarComponent({
 					</button>
 					<button
 						type="button"
+						id="tab-thumbnails"
+						role="tab"
+						aria-selected={sidebarTab === "thumbnails"}
+						aria-controls="panel-thumbnails"
+						tabIndex={sidebarTab === "thumbnails" ? 0 : -1}
 						className={cn(
-							"px-3 py-1 text-xs font-medium rounded-md transition-all",
+							"px-3 py-1 text-xs font-medium rounded-md transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 outline-none",
 							sidebarTab === "thumbnails"
 								? "bg-background text-foreground shadow-sm"
 								: "text-muted-foreground hover:text-foreground",
@@ -357,16 +367,23 @@ function PdfSidebarComponent({
 					size="icon"
 					className="h-8 w-8 text-muted-foreground hover:text-foreground"
 					onClick={onClose}
+					aria-label="Close sidebar"
 				>
-					<X className="h-4 w-4" />
+					<X className="h-4 w-4" aria-hidden="true" />
 				</Button>
 			</div>
 
-			{/* Content area */}
-			<div className="flex-1 overflow-auto p-3 scrollbar-thin">
-				{sidebarTab === "outline" ? (
-					hasOutline ? (
-						<div className="pdf-outline animate-in fade-in duration-300">
+			{/* Content area - both panels always in DOM for aria-controls */}
+			<div className="flex-1 overflow-hidden p-3 scrollbar-thin flex flex-col">
+				{/* Outline panel */}
+				<div
+					id="panel-outline"
+					role="tabpanel"
+					aria-labelledby="tab-outline"
+					className={sidebarTab === "outline" ? "flex-1 overflow-auto" : "hidden"}
+				>
+					{hasOutline ? (
+						<div className="pdf-outline">
 							<OutlineTree
 								items={outlineItems}
 								selectedOutlineId={selectedOutlineId}
@@ -380,33 +397,42 @@ function PdfSidebarComponent({
 						</div>
 					) : (
 						<div className="p-8 text-center text-sm text-muted-foreground flex flex-col items-center gap-3 opacity-60">
-							<Menu className="h-8 w-8 opacity-20" />
+							<Menu className="h-8 w-8 opacity-20" aria-hidden="true" />
 							<p>No outline available</p>
 						</div>
-					)
-				) : (
-					<Virtuoso
-						ref={thumbnailListRef}
-						style={{ height: "100%" }}
-						totalCount={numPages}
-						initialTopMostItemIndex={Math.max(0, Math.min(currentPage - 1, numPages - 1))}
-						itemContent={(index) => {
-							const page = index + 1;
-							return (
-								<div className="pb-4 px-1">
-									<MemoizedThumbnailItem
-										key={`${fileKey}-${page}`}
-										pageNumber={page}
-										pdf={pdfDoc}
-										isSelected={page >= pageRange.start && page <= pageRange.end}
-										isCurrent={currentPage === page}
-										onSelect={onThumbnailSelect}
-									/>
-								</div>
-							);
-						}}
-					/>
-				)}
+					)}
+				</div>
+				{/* Thumbnails panel - container always in DOM, Virtuoso conditionally rendered to ensure correct height measurement */}
+				<div
+					id="panel-thumbnails"
+					role="tabpanel"
+					aria-labelledby="tab-thumbnails"
+					className={sidebarTab === "thumbnails" ? "flex-1 overflow-hidden" : "hidden"}
+				>
+					{sidebarTab === "thumbnails" && (
+						<Virtuoso
+							ref={thumbnailListRef}
+							style={{ height: "100%" }}
+							totalCount={numPages}
+							initialTopMostItemIndex={Math.max(0, Math.min(currentPage - 1, numPages - 1))}
+							itemContent={(index) => {
+								const page = index + 1;
+								return (
+									<div className="pb-4 px-1">
+										<MemoizedThumbnailItem
+											key={`${fileKey}-${page}`}
+											pageNumber={page}
+											pdf={pdfDoc}
+											isSelected={page >= pageRange.start && page <= pageRange.end}
+											isCurrent={currentPage === page}
+											onSelect={onThumbnailSelect}
+										/>
+									</div>
+								);
+							}}
+						/>
+					)}
+				</div>
 			</div>
 		</>
 	);

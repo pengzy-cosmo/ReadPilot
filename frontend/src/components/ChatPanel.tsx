@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import type { Message } from "@/hooks/useChat";
-import { cn, preprocessLaTeX } from "@/lib/utils";
+import { cn, preprocessLaTeX, sanitizeAriaLabel } from "@/lib/utils";
 
 interface PageRangeMeta {
 	pageStart: number;
@@ -128,7 +128,7 @@ export function ChatPanel({
 
 	const renderTypingIndicator = () => (
 		<div className="flex items-center gap-2 text-xs text-muted-foreground">
-			<span>Thinking</span>
+			<span>Thinking…</span>
 			<span className="flex items-center gap-1" aria-hidden="true">
 				<span
 					className="size-1.5 rounded-full bg-muted-foreground/70 animate-bounce"
@@ -163,41 +163,41 @@ export function ChatPanel({
 						size="icon"
 						onClick={onSummarize}
 						disabled={disabled || isLoading}
-						title="Summarize selected pages"
+						aria-label="Summarize selected pages"
 						className="h-8 w-8 text-muted-foreground hover:text-primary"
 					>
-						<Sparkles className="size-4" />
+						<Sparkles className="size-4" aria-hidden="true" />
 					</Button>
-					<div className="h-4 w-px bg-border/60 mx-1" />
+					<div className="h-4 w-px bg-border/60 mx-1" aria-hidden="true" />
 					<Button
 						variant="ghost"
 						size="icon"
 						onClick={onOpenSessions}
 						disabled={disabled}
-						title="History"
+						aria-label="History"
 						className="h-8 w-8 text-muted-foreground hover:text-foreground"
 					>
-						<History className="size-4" />
+						<History className="size-4" aria-hidden="true" />
 					</Button>
 					<Button
 						variant="ghost"
 						size="icon"
 						onClick={handleNewSession}
 						disabled={disabled || isLoading}
-						title="New session"
+						aria-label="New session"
 						className="h-8 w-8 text-muted-foreground hover:text-foreground"
 					>
-						<Plus className="size-4" />
+						<Plus className="size-4" aria-hidden="true" />
 					</Button>
 					<Button
 						variant="ghost"
 						size="icon"
 						onClick={handleClear}
 						disabled={disabled || isLoading || messages.length === 0}
-						title="Clear chat"
+						aria-label="Clear chat"
 						className="h-8 w-8 text-muted-foreground hover:text-destructive"
 					>
-						<Trash2 className="size-4" />
+						<Trash2 className="size-4" aria-hidden="true" />
 					</Button>
 				</div>
 			</div>
@@ -207,7 +207,7 @@ export function ChatPanel({
 					{showEmptyState && (
 						<div className="flex flex-col items-center justify-center text-center mt-12 gap-4">
 							<div className="size-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
-								<Bot className="size-6" />
+								<Bot className="size-6" aria-hidden="true" />
 							</div>
 							<div>
 								<h3 className="font-medium text-foreground">{disabled ? "Open a PDF First" : "How can I help you?"}</h3>
@@ -225,7 +225,7 @@ export function ChatPanel({
 										className="h-7 text-xs rounded-full bg-background"
 										onClick={onSummarize}
 									>
-										<Sparkles className="size-3 mr-1.5 text-primary" />
+										<Sparkles className="size-3 mr-1.5 text-primary" aria-hidden="true" />
 										Summarize these pages
 									</Button>
 								</div>
@@ -243,7 +243,11 @@ export function ChatPanel({
 										isUser ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
 									)}
 								>
-									{isUser ? <User className="size-4" /> : <Bot className="size-4" />}
+									{isUser ? (
+										<User className="size-4" aria-hidden="true" />
+									) : (
+										<Bot className="size-4" aria-hidden="true" />
+									)}
 								</div>
 
 								<div className={cn("flex flex-col max-w-[85%] gap-1", isUser ? "items-end" : "items-start")}>
@@ -275,7 +279,7 @@ export function ChatPanel({
 					{streamingContent && (
 						<div className="flex gap-3 flex-row">
 							<div className="size-8 shrink-0 rounded-lg bg-muted flex items-center justify-center text-muted-foreground">
-								<Bot className="size-4" />
+								<Bot className="size-4" aria-hidden="true" />
 							</div>
 							<div className="flex flex-col max-w-[85%] gap-1 items-start">
 								{streamingMeta && (
@@ -293,7 +297,7 @@ export function ChatPanel({
 					{showLoadingIndicator && (
 						<div className="flex gap-3 flex-row">
 							<div className="size-8 shrink-0 rounded-lg bg-muted flex items-center justify-center text-muted-foreground">
-								<Bot className="size-4" />
+								<Bot className="size-4" aria-hidden="true" />
 							</div>
 							<div className="flex flex-col max-w-[85%] gap-1 items-start">
 								{streamingMeta && (
@@ -333,26 +337,31 @@ export function ChatPanel({
 										className="pointer-events-auto flex items-center gap-1 shrink-0 rounded-full border border-primary/20 bg-primary/5 px-2 py-0.5 text-[10px] font-medium text-primary shadow-sm animate-in fade-in zoom-in-95 duration-200 group hover:bg-primary/10 transition-colors cursor-default max-w-[120px]"
 										title={text}
 									>
-										<Quote className="size-2.5 opacity-50" />
+										<Quote className="size-2.5 opacity-50" aria-hidden="true" />
 										<span className="truncate">{text}</span>
 										{onRemoveSelection && (
 											<button
 												type="button"
 												onClick={() => onRemoveSelection(index)}
 												className="ml-0.5 rounded-full p-0.5 hover:bg-destructive/20 hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"
+												aria-label={`Remove highlight: ${sanitizeAriaLabel(text)}`}
 											>
-												<X className="size-2.5" />
+												<X className="size-2.5" aria-hidden="true" />
 											</button>
 										)}
 									</div>
 								))}
 							</div>
 						)}
+						<label htmlFor="chat-input" className="sr-only">
+							Message
+						</label>
 						<Textarea
+							id="chat-input"
 							value={input}
 							onChange={(event) => setInput(event.target.value)}
 							onKeyDown={handleKeyDown}
-							placeholder={selectedTexts.length > 0 ? "Ask about the highlighted text..." : "Ask anything..."}
+							placeholder={selectedTexts.length > 0 ? "Ask about the highlighted text…" : "Ask anything…"}
 							disabled={disabled || isLoading}
 							className="resize-none min-h-[50px] max-h-[200px] border-0 focus-visible:ring-0 bg-transparent py-3.5 pl-4 pr-12 shadow-none scrollbar-hide"
 							rows={1}
@@ -374,7 +383,11 @@ export function ChatPanel({
 									: "bg-transparent text-muted-foreground hover:bg-muted",
 							)}
 						>
-							{isLoading ? <Loader2 className="size-4 animate-spin" /> : <SendHorizontal className="size-4" />}
+							{isLoading ? (
+								<Loader2 className="size-4 animate-spin" aria-hidden="true" />
+							) : (
+								<SendHorizontal className="size-4" aria-hidden="true" />
+							)}
 							<span className="sr-only">Send</span>
 						</Button>
 					</form>

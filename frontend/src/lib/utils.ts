@@ -6,6 +6,19 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * Sanitize text for use in aria-label: collapse whitespace, remove newlines,
+ * and truncate to a reasonable length for screen readers.
+ */
+export function sanitizeAriaLabel(text: string, maxLength = 30): string {
+	const cleaned = text
+		.replace(/[\r\n]+/g, " ")
+		.replace(/\s+/g, " ")
+		.trim();
+	if (cleaned.length <= maxLength) return cleaned;
+	return `${cleaned.slice(0, maxLength)}…`;
+}
+
+/**
  * Preprocess LaTeX math delimiters to convert \[..\] and \(...\) to $$..$$ and $..$
  * This enables remark-math to parse LaTeX-style delimiters that some LLMs output.
  */

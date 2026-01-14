@@ -89,7 +89,7 @@ export function ApiSettings({ isOpen, onClose, config, onSave }: ApiSettingsProp
 							type="password"
 							value={currentApiKey}
 							onChange={(e) => handleApiKeyChange(e.target.value)}
-							placeholder={localConfig.provider === "openai" ? "sk-..." : "..."}
+							placeholder={localConfig.provider === "openai" ? "sk-…" : "…"}
 						/>
 						<p className="text-xs text-muted-foreground mt-1">Stored locally in browser</p>
 					</div>

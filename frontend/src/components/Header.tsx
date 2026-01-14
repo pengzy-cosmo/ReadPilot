@@ -14,7 +14,7 @@ export function Header({ isUploading, onOpenLibrary, onOpenSettings }: HeaderPro
 		<header className="h-14 border-b border-border/40 bg-background/60 backdrop-blur-xl flex items-center justify-between px-4 fixed top-0 w-full z-50 transition-all">
 			<div className="flex items-center gap-2">
 				<div className="size-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
-					<BookOpen className="size-4" />
+					<BookOpen className="size-4" aria-hidden="true" />
 				</div>
 				<h1 className="font-semibold text-lg tracking-tight">ReadPilot</h1>
 			</div>
@@ -22,8 +22,8 @@ export function Header({ isUploading, onOpenLibrary, onOpenSettings }: HeaderPro
 			<div className="flex items-center gap-2">
 				{isUploading && (
 					<div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted text-xs font-medium text-muted-foreground animate-in fade-in zoom-in-95">
-						<Loader2 className="size-3 animate-spin" />
-						<span>Uploading...</span>
+						<Loader2 className="size-3 animate-spin" aria-hidden="true" />
+						<span>Uploading…</span>
 					</div>
 				)}
 
@@ -35,7 +35,7 @@ export function Header({ isUploading, onOpenLibrary, onOpenSettings }: HeaderPro
 					onClick={onOpenLibrary}
 					className="text-muted-foreground hover:text-foreground"
 				>
-					<BookOpen className="size-4 mr-2" />
+					<BookOpen className="size-4 mr-2" aria-hidden="true" />
 					Library
 				</Button>
 				<Button
@@ -43,8 +43,9 @@ export function Header({ isUploading, onOpenLibrary, onOpenSettings }: HeaderPro
 					size="icon"
 					onClick={onOpenSettings}
 					className="text-muted-foreground hover:text-foreground"
+					aria-label="Settings"
 				>
-					<Settings className="size-4" />
+					<Settings className="size-4" aria-hidden="true" />
 					<span className="sr-only">Settings</span>
 				</Button>
 			</div>

@@ -179,22 +179,22 @@ export function TextSelectionPopup({
 					size="sm"
 					onClick={() => handleAction("add")}
 					className="h-7 px-3 rounded-full hover:bg-white/20 text-background gap-1.5 border-0 bg-transparent"
-					title="Add to context list"
+					aria-label="Add to context list"
 				>
-					<Plus className="h-3.5 w-3.5" />
+					<Plus className="h-3.5 w-3.5" aria-hidden="true" />
 					<span className="text-xs font-medium">Add</span>
 				</Button>
 
 				{onExplainSelection && (
 					<>
-						<div className="w-px h-3 bg-background/20 mx-0.5" />
+						<div className="w-px h-3 bg-background/20 mx-0.5" aria-hidden="true" />
 						<Button
 							size="sm"
 							onClick={() => handleAction("explain")}
 							className="h-7 px-3 rounded-full hover:bg-white/20 text-background gap-1.5 border-0 bg-transparent"
-							title="Ask AI to explain this text"
+							aria-label="Ask AI to explain this text"
 						>
-							<Sparkles className="h-3.5 w-3.5" />
+							<Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
 							<span className="text-xs font-medium">Explain</span>
 						</Button>
 					</>

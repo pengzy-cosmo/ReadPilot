@@ -50,15 +50,15 @@ export function SessionListModal({
 				<CardHeader className="flex flex-row items-center justify-between gap-3 border-b border-border/40 px-6 py-4">
 					<div className="flex items-center gap-2">
 						<div className="size-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
-							<History className="size-4" />
+							<History className="size-4" aria-hidden="true" />
 						</div>
 						<div>
 							<CardTitle className="text-base">Sessions</CardTitle>
 							<p className="text-xs text-muted-foreground">Pick a recent conversation</p>
 						</div>
 					</div>
-					<Button variant="ghost" size="icon" onClick={onClose}>
-						<X className="size-4" />
+					<Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
+						<X className="size-4" aria-hidden="true" />
 						<span className="sr-only">Close</span>
 					</Button>
 				</CardHeader>
@@ -83,7 +83,7 @@ export function SessionListModal({
 										<button
 											type="button"
 											onClick={() => onOpenSession(session.session_id)}
-											className="flex items-center gap-3 min-w-0 overflow-hidden text-left"
+											className="flex items-center gap-3 min-w-0 overflow-hidden text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 outline-none rounded-lg"
 										>
 											<div
 												className={cn(
@@ -91,7 +91,7 @@ export function SessionListModal({
 													isActive ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground",
 												)}
 											>
-												<History className="size-4" />
+												<History className="size-4" aria-hidden="true" />
 											</div>
 											<div className="min-w-0 flex-1">
 												<div className="font-medium truncate">
@@ -110,8 +110,9 @@ export function SessionListModal({
 											size="icon"
 											className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
 											onClick={(e) => handleDelete(e, session.session_id)}
+											aria-label={`Delete session ${session.title || `Session ${sessions.length - index}`}`}
 										>
-											<Trash2 className="size-4" />
+											<Trash2 className="size-4" aria-hidden="true" />
 										</Button>
 									</div>
 								);

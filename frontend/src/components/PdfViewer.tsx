@@ -1018,8 +1018,8 @@ export function PdfViewer({
 															loading={
 																<div className="h-full w-full bg-muted/10 animate-pulse flex items-center justify-center">
 																	<div className="flex flex-col items-center gap-2 opacity-20">
-																		<FileText className="h-10 w-10" />
-																		<span className="text-xs">Loading Page {pageNumber}</span>
+																		<FileText className="h-10 w-10" aria-hidden="true" />
+																		<span className="text-xs">Loading Page {pageNumber}…</span>
 																	</div>
 																</div>
 															}
@@ -1044,7 +1044,7 @@ export function PdfViewer({
 							/* Empty State */
 							<div className="flex flex-col h-full items-center justify-center text-sm text-muted-foreground gap-6 animate-in fade-in duration-500">
 								<div className="p-8 rounded-full bg-muted/30 border border-border/50 shadow-sm">
-									<FileText className="h-16 w-16 opacity-10" />
+									<FileText className="h-16 w-16 opacity-10" aria-hidden="true" />
 								</div>
 								<div className="text-center space-y-2">
 									<p className="text-lg font-medium text-foreground">No Document Loaded</p>
@@ -1063,7 +1063,7 @@ export function PdfViewer({
 							<div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-[2px] z-50 animate-in fade-in duration-300">
 								<div className="flex flex-col items-center gap-4 p-6 rounded-2xl bg-card/80 shadow-xl border border-white/10">
 									<div className="h-12 w-12 animate-spin rounded-full border-[3px] border-primary border-t-transparent shadow-sm" />
-									<span className="text-sm font-medium animate-pulse">Loading Document...</span>
+									<span className="text-sm font-medium animate-pulse">Loading Document…</span>
 								</div>
 							</div>
 						)}
@@ -1073,7 +1073,7 @@ export function PdfViewer({
 							<div className="absolute inset-0 flex items-center justify-center bg-background/80 z-50 animate-in fade-in zoom-in-95 duration-300">
 								<div className="bg-destructive/5 text-destructive border border-destructive/10 p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-3 max-w-md text-center backdrop-blur-md">
 									<div className="p-3 rounded-full bg-destructive/10 mb-2">
-										<X className="h-8 w-8" />
+										<X className="h-8 w-8" aria-hidden="true" />
 									</div>
 									<p className="font-semibold text-lg">Unable to load document</p>
 									<p className="text-sm opacity-80 leading-relaxed">{loadError}</p>

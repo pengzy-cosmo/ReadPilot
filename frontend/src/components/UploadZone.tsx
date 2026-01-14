@@ -59,7 +59,7 @@ export function UploadZone({ onFileSelect, isUploading }: UploadZoneProps) {
 			<button
 				type="button"
 				className={cn(
-					"relative group w-full max-w-lg aspect-video rounded-3xl border-2 border-dashed transition-all duration-300 ease-out flex flex-col items-center justify-center p-8 text-center",
+					"relative group w-full max-w-lg aspect-video rounded-3xl border-2 border-dashed transition-all duration-300 ease-out flex flex-col items-center justify-center p-8 text-center focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 outline-none",
 					isUploading ? "cursor-not-allowed" : "cursor-pointer",
 					isDragging
 						? "border-primary bg-primary/5 scale-[1.02]"
@@ -70,24 +70,26 @@ export function UploadZone({ onFileSelect, isUploading }: UploadZoneProps) {
 				onDrop={handleDrop}
 				onClick={handleClick}
 				disabled={isUploading}
+				aria-label="Upload PDF file"
 			>
 				<div className="absolute inset-0 bg-gradient-to-tr from-primary/5 via-transparent to-primary/5 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity" />
 
 				<div className="relative z-10 flex flex-col items-center gap-4">
 					<div className="p-4 rounded-2xl bg-background shadow-lg shadow-primary/5 group-hover:scale-110 transition-transform duration-300 border border-border/50">
 						{isUploading ? (
-							<Loader2 className="size-8 text-primary animate-spin" />
+							<Loader2 className="size-8 text-primary animate-spin" aria-hidden="true" />
 						) : isDragging ? (
-							<FileUp className="size-8 text-primary animate-bounce" />
+							<FileUp className="size-8 text-primary animate-bounce" aria-hidden="true" />
 						) : (
-							<Upload className="size-8 text-muted-foreground group-hover:text-primary transition-colors" />
+							<Upload
+								className="size-8 text-muted-foreground group-hover:text-primary transition-colors"
+								aria-hidden="true"
+							/>
 						)}
 					</div>
 
 					<div className="space-y-1">
-						<h3 className="text-xl font-medium tracking-tight">
-							{isUploading ? "Uploading..." : "Drop your PDF here"}
-						</h3>
+						<h3 className="text-xl font-medium tracking-tight">{isUploading ? "Uploading…" : "Drop your PDF here"}</h3>
 						<p className="text-sm text-muted-foreground">or click to browse from your computer</p>
 					</div>
 				</div>

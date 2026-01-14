@@ -60,7 +60,7 @@ export function BookshelfModal({
 				<CardHeader className="flex flex-row items-center justify-between gap-3 border-b border-border/40 px-6 py-4">
 					<div className="flex items-center gap-2">
 						<div className="size-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
-							<BookOpen className="size-4" />
+							<BookOpen className="size-4" aria-hidden="true" />
 						</div>
 						<div>
 							<CardTitle className="text-base">Library</CardTitle>
@@ -71,12 +71,12 @@ export function BookshelfModal({
 					</div>
 					<div className="flex items-center gap-1">
 						<Button variant="outline" size="sm" className="h-8 gap-2" onClick={onImportClick}>
-							<FolderOpen className="size-3.5" />
+							<FolderOpen className="size-3.5" aria-hidden="true" />
 							<span className="hidden sm:inline">Open PDF</span>
 							<span className="sm:hidden">Open</span>
 						</Button>
-						<Button variant="ghost" size="icon" onClick={onClose}>
-							<X className="size-4" />
+						<Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
+							<X className="size-4" aria-hidden="true" />
 							<span className="sr-only">Close</span>
 						</Button>
 					</div>
@@ -98,10 +98,10 @@ export function BookshelfModal({
 									<button
 										type="button"
 										onClick={() => onOpenDocument(doc.doc_id)}
-										className="flex items-center gap-3 min-w-0 overflow-hidden text-left"
+										className="flex items-center gap-3 min-w-0 overflow-hidden text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 outline-none rounded-lg"
 									>
 										<div className="size-9 shrink-0 rounded-lg bg-muted flex items-center justify-center text-muted-foreground">
-											<BookOpen className="size-4" />
+											<BookOpen className="size-4" aria-hidden="true" />
 										</div>
 										<div className="min-w-0 flex-1 space-y-0.5">
 											<div className="font-medium truncate">{doc.title || doc.filename}</div>
@@ -120,8 +120,9 @@ export function BookshelfModal({
 										size="icon"
 										className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
 										onClick={(e) => handleDelete(e, doc.doc_id)}
+										aria-label={`Delete ${doc.title || doc.filename}`}
 									>
-										<Trash2 className="size-4" />
+										<Trash2 className="size-4" aria-hidden="true" />
 									</Button>
 								</div>
 							))}

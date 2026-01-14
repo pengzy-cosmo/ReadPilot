@@ -47,6 +47,7 @@
 
 :root {
 	--radius: 0.5rem;
+	color-scheme: light;
 
 	/* Zinc-like Light Theme (OKLCH) */
 	--background: oklch(0.985 0.002 247.839);
@@ -84,6 +85,8 @@
 }
 
 .dark {
+	color-scheme: dark;
+
 	/* Zinc-like Dark Theme (OKLCH) */
 	--background: oklch(0.141 0.005 285.823);
 	--foreground: oklch(0.985 0 0);
@@ -206,4 +209,16 @@
 
 ::-webkit-scrollbar-thumb {
 	@apply bg-muted-foreground/20 rounded-full transition-colors hover:bg-muted-foreground/40;
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
+	}
 }
