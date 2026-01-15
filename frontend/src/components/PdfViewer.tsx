@@ -443,19 +443,20 @@ export function PdfViewer({
 
 	const getOutlineFlatWithPages = useCallback(async () => {
 		const flat = flattenOutline(outlineItems);
-		const resolved: (OutlineFlatItem & { pageNumber: number | null })[] = [];
-		for (const item of flat) {
-			if (item.url) {
-				resolved.push({ ...item, pageNumber: null });
-				continue;
-			}
-			let pageNumber = outlinePageCacheRef.current.get(item.id) ?? null;
-			if (!pageNumber) {
-				pageNumber = await resolveDestPageNumber(pdfRef.current, item.dest);
-				if (pageNumber) outlinePageCacheRef.current.set(item.id, pageNumber);
-			}
-			resolved.push({ ...item, pageNumber });
-		}
+		// Parallel resolution for all outline items
+		const resolved = await Promise.all(
+			flat.map(async (item) => {
+				if (item.url) {
+					return { ...item, pageNumber: null };
+				}
+				let pageNumber = outlinePageCacheRef.current.get(item.id) ?? null;
+				if (!pageNumber) {
+					pageNumber = await resolveDestPageNumber(pdfRef.current, item.dest);
+					if (pageNumber) outlinePageCacheRef.current.set(item.id, pageNumber);
+				}
+				return { ...item, pageNumber };
+			}),
+		);
 		return resolved;
 	}, [outlineItems, outlinePageCacheRef, resolveDestPageNumber]);
 

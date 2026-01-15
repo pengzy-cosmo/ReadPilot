@@ -275,7 +275,7 @@ function App() {
 			});
 		}, 400);
 		return () => clearTimeout(timer);
-	}, [currentPage, docId, pageRange, sessionId]);
+	}, [currentPage, docId, pageRange.start, pageRange.end, sessionId]);
 
 	const getBookContext = useCallback((): BookContext => {
 		// Provide document context to the LLM without extra API roundtrips.
@@ -357,8 +357,8 @@ function App() {
 		if (!sessionId) return;
 		replaceMessages([]);
 		messageCountRef.current = 0;
-		await clearMessages(sessionId);
-		await updateSessionTitle(sessionId, null);
+		// Parallel execution - these operations are independent
+		await Promise.all([clearMessages(sessionId), updateSessionTitle(sessionId, null)]);
 		setSessionTitle(null);
 		setSessionSubtitle(null);
 		if (showSessions && docId) {

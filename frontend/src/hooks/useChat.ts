@@ -145,6 +145,7 @@ export function useChat(apiConfig: ApiConfig) {
 
 				const decoder = new TextDecoder();
 				let fullContent = "";
+				let rafId: number | null = null;
 
 				while (true) {
 					const { done, value } = await reader.read();
@@ -152,9 +153,18 @@ export function useChat(apiConfig: ApiConfig) {
 
 					const chunk = decoder.decode(value, { stream: true });
 					fullContent += chunk;
-					// Update UI progressively for streaming effect.
-					setStreamingContent(fullContent);
+					// Batch UI updates using requestAnimationFrame (max once per frame ~16.67ms)
+					if (!rafId) {
+						rafId = requestAnimationFrame(() => {
+							setStreamingContent(fullContent);
+							rafId = null;
+						});
+					}
 				}
+
+				// Ensure final content is rendered
+				if (rafId) cancelAnimationFrame(rafId);
+				setStreamingContent(fullContent);
 
 				return fullContent;
 			};
