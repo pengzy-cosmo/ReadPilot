@@ -38,8 +38,8 @@ export interface PdfViewerProps {
 	onTextSelect?: (text: string) => void;
 	onExplainText?: (text: string) => void;
 	initialPage?: number;
-	autoFollow?: boolean;
-	contextWindow?: number;
+	initialAutoFollow?: boolean;
+	initialContextWindow?: number;
 }
 
 type FitMode = "page-width" | "page-fit";
@@ -103,8 +103,8 @@ export function PdfViewer({
 	onTextSelect,
 	onExplainText,
 	initialPage,
-	autoFollow = true,
-	contextWindow = 3,
+	initialAutoFollow = true,
+	initialContextWindow = 3,
 }: PdfViewerProps) {
 	// -------------------------------------------------------------------------
 	// State: Document
@@ -147,8 +147,8 @@ export function PdfViewer({
 	// State: AI Context Range
 	// -------------------------------------------------------------------------
 
-	const [localAutoFollow, setLocalAutoFollow] = useState(autoFollow);
-	const [contextWindowSize, setContextWindowSize] = useState(contextWindow);
+	const [localAutoFollow, setLocalAutoFollow] = useState(initialAutoFollow);
+	const [contextWindowSize, setContextWindowSize] = useState(initialContextWindow);
 	const [rangeInput, setRangeInput] = useState({ start: "1", end: "1" });
 
 	// -------------------------------------------------------------------------
@@ -593,8 +593,6 @@ export function PdfViewer({
 			onPageRangeChange({ start, end });
 		}
 	}, [currentPage, localAutoFollow, contextWindowSize, numPages, onPageRangeChange]);
-
-	useEffect(() => setContextWindowSize(contextWindow), [contextWindow]);
 
 	// Switch to thumbnails tab if no outline
 	useEffect(() => {

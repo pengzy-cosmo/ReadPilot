@@ -463,8 +463,8 @@ function App() {
 							onTextSelect={handleAddSelection}
 							onExplainText={handleExplainSelection}
 							initialPage={initialPage}
-							autoFollow={true}
-							contextWindow={3}
+							initialAutoFollow={true}
+							initialContextWindow={3}
 						/>
 					</Panel>
 
@@ -524,6 +524,7 @@ function App() {
 				onDelete={handleDeleteSession}
 			/>
 			<ApiSettings
+				key={showSettings ? "open" : "closed"}
 				isOpen={showSettings}
 				onClose={() => setShowSettings(false)}
 				config={apiConfig}

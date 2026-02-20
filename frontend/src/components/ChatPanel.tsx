@@ -1,5 +1,5 @@
 /** ChatPanel - AI chat interface with streaming responses and markdown support. */
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
@@ -12,6 +12,49 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import type { Message } from "@/hooks/useChat";
 import { cn, preprocessLaTeX, sanitizeAriaLabel } from "@/lib/utils";
+
+const EMPTY_SELECTIONS: string[] = [];
+const MARKDOWN_REMARK_PLUGINS = [remarkGfm, remarkMath];
+const MARKDOWN_REHYPE_PLUGINS = [rehypeKatex];
+
+const MarkdownMessage = memo(function MarkdownMessage({
+	content,
+	showCaret = false,
+}: {
+	content: string;
+	showCaret?: boolean;
+}) {
+	return (
+		<div className="prose prose-sm dark:prose-invert max-w-none break-words">
+			<ReactMarkdown remarkPlugins={MARKDOWN_REMARK_PLUGINS} rehypePlugins={MARKDOWN_REHYPE_PLUGINS}>
+				{preprocessLaTeX(content)}
+			</ReactMarkdown>
+			{showCaret && <span className="animate-pulse inline-block w-1.5 h-3.5 bg-primary ml-0.5 align-middle" />}
+		</div>
+	);
+});
+
+const TypingIndicator = memo(function TypingIndicator() {
+	return (
+		<div className="flex items-center gap-2 text-xs text-muted-foreground">
+			<span>Thinking…</span>
+			<span className="flex items-center gap-1" aria-hidden="true">
+				<span
+					className="size-1.5 rounded-full bg-muted-foreground/70 animate-bounce"
+					style={{ animationDelay: "0ms" }}
+				/>
+				<span
+					className="size-1.5 rounded-full bg-muted-foreground/70 animate-bounce"
+					style={{ animationDelay: "150ms" }}
+				/>
+				<span
+					className="size-1.5 rounded-full bg-muted-foreground/70 animate-bounce"
+					style={{ animationDelay: "300ms" }}
+				/>
+			</span>
+		</div>
+	);
+});
 
 interface PageRangeMeta {
 	pageStart: number;
@@ -45,7 +88,7 @@ export function ChatPanel({
 	sessionTitle,
 	sessionSubtitle,
 	pageRange,
-	selectedTexts = [],
+	selectedTexts = EMPTY_SELECTIONS,
 	onRemoveSelection,
 	messages,
 	isLoading,
@@ -115,36 +158,6 @@ export function ChatPanel({
 		setInput("");
 		onClear();
 	};
-
-	/** Render markdown with GFM tables and LaTeX math support. */
-	const renderMarkdown = (content: string, showCaret = false) => (
-		<div className="prose prose-sm dark:prose-invert max-w-none break-words">
-			<ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
-				{preprocessLaTeX(content)}
-			</ReactMarkdown>
-			{showCaret && <span className="animate-pulse inline-block w-1.5 h-3.5 bg-primary ml-0.5 align-middle" />}
-		</div>
-	);
-
-	const renderTypingIndicator = () => (
-		<div className="flex items-center gap-2 text-xs text-muted-foreground">
-			<span>Thinking…</span>
-			<span className="flex items-center gap-1" aria-hidden="true">
-				<span
-					className="size-1.5 rounded-full bg-muted-foreground/70 animate-bounce"
-					style={{ animationDelay: "0ms" }}
-				/>
-				<span
-					className="size-1.5 rounded-full bg-muted-foreground/70 animate-bounce"
-					style={{ animationDelay: "150ms" }}
-				/>
-				<span
-					className="size-1.5 rounded-full bg-muted-foreground/70 animate-bounce"
-					style={{ animationDelay: "300ms" }}
-				/>
-			</span>
-		</div>
-	);
 
 	const showEmptyState = messages.length === 0 && !streamingContent;
 	const showLoadingIndicator = isLoading && !streamingContent;
@@ -268,7 +281,7 @@ export function ChatPanel({
 										{isUser ? (
 											<div className="whitespace-pre-wrap">{message.content}</div>
 										) : (
-											renderMarkdown(message.content)
+											<MarkdownMessage content={message.content} />
 										)}
 									</div>
 								</div>
@@ -288,7 +301,7 @@ export function ChatPanel({
 									</span>
 								)}
 								<div className="px-4 py-2.5 rounded-2xl rounded-tl-sm bg-card border border-border/50 shadow-sm text-sm leading-relaxed w-full">
-									{renderMarkdown(streamingContent, true)}
+									<MarkdownMessage content={streamingContent} showCaret />
 								</div>
 							</div>
 						</div>
@@ -306,7 +319,7 @@ export function ChatPanel({
 									</span>
 								)}
 								<div className="px-4 py-2.5 rounded-2xl rounded-tl-sm bg-card border border-border/50 shadow-sm text-sm leading-relaxed w-full">
-									{renderTypingIndicator()}
+									<TypingIndicator />
 								</div>
 							</div>
 						</div>

@@ -1,5 +1,5 @@
 /** ApiSettings - Modal for configuring LLM provider, API keys, and model. */
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,11 +16,7 @@ interface ApiSettingsProps {
 const PROVIDERS: LLMProvider[] = ["openai", "anthropic", "gemini"];
 
 export function ApiSettings({ isOpen, onClose, config, onSave }: ApiSettingsProps) {
-	const [localConfig, setLocalConfig] = useState(config);
-
-	useEffect(() => {
-		setLocalConfig(config);
-	}, [config]);
+	const [localConfig, setLocalConfig] = useState(() => config);
 
 	if (!isOpen) return null;
 

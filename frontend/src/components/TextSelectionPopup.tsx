@@ -135,7 +135,7 @@ export function TextSelectionPopup({
 
 		container.addEventListener("mouseup", handleMouseUp);
 		container.addEventListener("keyup", handleMouseUp); // For keyboard selection (Shift+Arrow)
-		container.addEventListener("touchend", handleMouseUp); // For touch devices
+		container.addEventListener("touchend", handleMouseUp, { passive: true }); // For touch devices
 		document.addEventListener("mousedown", handleClickOutside);
 		container.addEventListener("scroll", handleScroll, true);
 
