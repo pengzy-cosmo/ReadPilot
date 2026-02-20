@@ -75,12 +75,5 @@ coverage/
 *.cover
 .hypothesis/
 
-# AI Agents
-CLAUDE.md
-.claude/
-AGENTS.md
-GEMINI.md
-.gemini/
-
 # ReadPilot specific
 backend/storage/
