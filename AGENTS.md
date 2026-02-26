@@ -6,6 +6,8 @@ AI agent development guide for this codebase.
 
 LLM-assisted PDF reader with intelligent context management. Users read PDFs, select pages/text, and chat with LLM about content. Supports multiple LLM providers (OpenAI, Anthropic, Gemini) via LiteLLM with native PDF input support.
 
+Update this file (AGENTS.md) with any architectural decisions, coding conventions, or development guidelines to ensure consistency across the codebase.
+
 ## Development Commands
 
 ### Frontend (React + Vite)
@@ -43,6 +45,8 @@ uv run pytest --cov  # Run tests with coverage
 | **PdfSidebar**         | `PdfSidebar.tsx`         | Outline tree, thumbnails                               |
 | **TextSelectionPopup** | `TextSelectionPopup.tsx` | Text selection with Add/Explain actions                |
 | **ChatPanel**          | `ChatPanel.tsx`          | Streaming markdown chat UI                             |
+| **Header**             | `Header.tsx`             | Sticky top bar with reading status + global actions    |
+| **Layout**             | `Layout.tsx`             | App shell container and max-width workspace framing    |
 | **useChat**            | `useChat.ts`             | Chat API, streaming, BookContext                       |
 | **ApiSettings**        | `ApiSettings.tsx`        | Provider selection & API key management                |
 
@@ -55,6 +59,20 @@ uv run pytest --cov  # Run tests with coverage
 5. **State sync**: Viewer updates → PATCH `/api/library/{doc_id}/state`
 
 ## Key Features
+
+### Frontend Reading-Focused UI System
+
+- **White-first reading canvas**: PDF page stays visually primary (`.pdf-page` uses white surface)
+- **Subtle neutral shell**: Surrounding UI uses light cool-neutral surfaces to avoid color cast around PDF
+- **Workspace framing**: Main content sits inside `surface-shell` to separate reading workspace from viewport edge
+- **Sticky reading header**: Header shows current page + AI context range when a document is open
+- **Unified overlays**: Library, sessions, and API settings modals share consistent surface/border/shadow language
+- **Token-driven styling**: UI relies on CSS variables in `frontend/src/index.css` (`--background`, `--card`, `--border`, `--primary`, etc.)
+
+#### Visual direction guardrail
+
+- Keep PDF readability first: avoid warm/yellow backgrounds that tint perceived page color.
+- Prefer neutral/white surrounding surfaces with restrained accent colors.
 
 ### Dual-Layer Context System
 
@@ -83,8 +101,8 @@ The system provides LLM with two distinct context layers:
 ### PDF Viewer
 
 - **Rendering**: `react-pdf` + `react-virtuoso` (virtualized)
-- **Toolbar**: Navigation, zoom, AI range inputs, search, settings
-- **Sidebar**: Outline tree + thumbnails, Shift-click ranges
+- **Toolbar**: Compact floating controls with search/settings popovers
+- **Sidebar**: Outline tree + thumbnails, Shift-click ranges, active section/page cues
 - **Section selection**: Brain icon → auto-range from heading to next same/higher level
 - **Search**: Full-text from current page, per-hit highlighting
 - **Assets**: PDF.js worker + wasm/cmaps from CDN
@@ -96,6 +114,7 @@ The system provides LLM with two distinct context layers:
 - **BookContext**: `{title, totalPages, currentPage, selectedRange, outline, overview, highlights}`
 - **Rendering**: react-markdown + KaTeX for LaTeX math
 - **Streaming**: Real-time chunks with typing indicator
+- **UI**: Note-like side panel styling with context/highlight pills integrated above input
 
 ### Backend Services
 
@@ -271,6 +290,21 @@ Every file includes a one-line purpose comment:
 - App.tsx: doc/session/page/range/highlights state
 - PdfViewer: local UI state (zoom, search, sidebar)
 - ChatPanel: input/messages display (no state ownership)
+
+**Header Reading Meta Pattern**:
+
+- `App.tsx` passes `readingMeta` to `Header` only when a document is open.
+- `Header` renders page progress and selected AI context range in a compact status capsule.
+
+### Frontend UI Conventions (Current)
+
+- Use design tokens from `frontend/src/index.css`; avoid hardcoded theme colors in components.
+- Reuse shell utilities for consistent surfaces:
+  - `.surface-shell` for major workspace containers
+  - `.surface-panel` for focused cards/empty states
+  - `.glass` for floating translucent controls
+- Keep viewer chrome visually secondary to PDF content (lower contrast than page body).
+- For new overlays/modals, match existing border radius, border opacity, and shadow depth used by Library/Sessions/API Settings.
 
 ## Pre-commit Hooks
 
