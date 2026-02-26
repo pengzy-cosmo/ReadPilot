@@ -55,11 +55,11 @@ export function BookshelfModal({
 	};
 
 	return (
-		<div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
-			<Card className="w-full max-w-4xl h-[75vh] border-border/60 bg-background/95 shadow-2xl flex flex-col">
-				<CardHeader className="flex flex-row items-center justify-between gap-3 border-b border-border/40 px-6 py-4">
+		<div className="fixed inset-0 z-50 flex items-center justify-center bg-background/50 backdrop-blur-sm p-4">
+			<Card className="flex h-[75vh] w-full max-w-4xl flex-col rounded-2xl border-border/70 bg-card/95 shadow-2xl">
+				<CardHeader className="flex flex-row items-center justify-between gap-3 border-b border-border/60 px-6 py-4">
 					<div className="flex items-center gap-2">
-						<div className="size-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+						<div className="flex size-8 items-center justify-center rounded-lg bg-primary/12 text-primary">
 							<BookOpen className="size-4" aria-hidden="true" />
 						</div>
 						<div>
@@ -70,12 +70,23 @@ export function BookshelfModal({
 						</div>
 					</div>
 					<div className="flex items-center gap-1">
-						<Button variant="outline" size="sm" className="h-8 gap-2" onClick={onImportClick}>
+						<Button
+							variant="outline"
+							size="sm"
+							className="h-8 gap-2 rounded-full border-border/70 bg-card/80"
+							onClick={onImportClick}
+						>
 							<FolderOpen className="size-3.5" aria-hidden="true" />
 							<span className="hidden sm:inline">Open PDF</span>
 							<span className="sm:hidden">Open</span>
 						</Button>
-						<Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
+						<Button
+							variant="ghost"
+							size="icon"
+							onClick={onClose}
+							aria-label="Close"
+							className="rounded-lg hover:bg-muted/70"
+						>
 							<X className="size-4" aria-hidden="true" />
 							<span className="sr-only">Close</span>
 						</Button>
@@ -91,8 +102,8 @@ export function BookshelfModal({
 								<div
 									key={doc.doc_id}
 									className={cn(
-										"group w-full rounded-xl border border-border/50 bg-card/40 px-4 py-3 text-left transition grid grid-cols-[1fr_auto] gap-4 items-center",
-										"hover:bg-muted/40 hover:border-border",
+										"group grid w-full grid-cols-[1fr_auto] items-center gap-4 rounded-xl border border-border/60 bg-card/65 px-4 py-3 text-left transition",
+										"hover:border-border hover:bg-muted/45",
 									)}
 								>
 									<button
@@ -100,7 +111,7 @@ export function BookshelfModal({
 										onClick={() => onOpenDocument(doc.doc_id)}
 										className="flex items-center gap-3 min-w-0 overflow-hidden text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 outline-none rounded-lg"
 									>
-										<div className="size-9 shrink-0 rounded-lg bg-muted flex items-center justify-center text-muted-foreground">
+										<div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted/75 text-muted-foreground">
 											<BookOpen className="size-4" aria-hidden="true" />
 										</div>
 										<div className="min-w-0 flex-1 space-y-0.5">
@@ -118,7 +129,7 @@ export function BookshelfModal({
 									<Button
 										variant="ghost"
 										size="icon"
-										className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
+										className="shrink-0 text-destructive opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:bg-destructive/10 hover:text-destructive"
 										onClick={(e) => handleDelete(e, doc.doc_id)}
 										aria-label={`Delete ${doc.title || doc.filename}`}
 									>

@@ -163,11 +163,11 @@ export function ChatPanel({
 	const showLoadingIndicator = isLoading && !streamingContent;
 
 	return (
-		<div className="flex-1 flex flex-col min-h-0 bg-background border-l border-border/40 overflow-hidden">
-			<div className="h-14 flex items-center justify-between px-4 border-b border-border/40 bg-muted/20 shrink-0">
+		<div className="flex flex-1 min-h-0 flex-col overflow-hidden border-l border-border/60 bg-card/75 backdrop-blur-[2px]">
+			<div className="flex h-14 shrink-0 items-center justify-between border-b border-border/60 bg-card/90 px-4">
 				<div className="min-w-0 pr-4">
-					<h2 className="text-sm font-semibold truncate">{sessionTitle || "New chat"}</h2>
-					<p className="text-xs text-muted-foreground truncate">{sessionSubtitle || "Ready to assist"}</p>
+					<h2 className="truncate text-sm font-semibold text-foreground">{sessionTitle || "New chat"}</h2>
+					<p className="truncate text-xs text-muted-foreground">{sessionSubtitle || "Ready to assist"}</p>
 				</div>
 
 				<div className="flex items-center gap-1">
@@ -177,7 +177,7 @@ export function ChatPanel({
 						onClick={onSummarize}
 						disabled={disabled || isLoading}
 						aria-label="Summarize selected pages"
-						className="h-8 w-8 text-muted-foreground hover:text-primary"
+						className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-primary/10 hover:text-primary"
 					>
 						<Sparkles className="size-4" aria-hidden="true" />
 					</Button>
@@ -188,7 +188,7 @@ export function ChatPanel({
 						onClick={onOpenSessions}
 						disabled={disabled}
 						aria-label="History"
-						className="h-8 w-8 text-muted-foreground hover:text-foreground"
+						className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-muted/70 hover:text-foreground"
 					>
 						<History className="size-4" aria-hidden="true" />
 					</Button>
@@ -198,7 +198,7 @@ export function ChatPanel({
 						onClick={handleNewSession}
 						disabled={disabled || isLoading}
 						aria-label="New session"
-						className="h-8 w-8 text-muted-foreground hover:text-foreground"
+						className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-muted/70 hover:text-foreground"
 					>
 						<Plus className="size-4" aria-hidden="true" />
 					</Button>
@@ -208,7 +208,7 @@ export function ChatPanel({
 						onClick={handleClear}
 						disabled={disabled || isLoading || messages.length === 0}
 						aria-label="Clear chat"
-						className="h-8 w-8 text-muted-foreground hover:text-destructive"
+						className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
 					>
 						<Trash2 className="size-4" aria-hidden="true" />
 					</Button>
@@ -216,14 +216,14 @@ export function ChatPanel({
 			</div>
 
 			<ScrollArea className="flex-1 min-h-0" ref={scrollRootRef}>
-				<div className="flex flex-col px-4 py-6 gap-6 max-w-3xl mx-auto w-full min-h-full justify-end">
+				<div className="mx-auto flex min-h-full w-full max-w-[46rem] flex-col justify-end gap-6 px-4 py-6">
 					{showEmptyState && (
-						<div className="flex flex-col items-center justify-center text-center mt-12 gap-4">
-							<div className="size-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+						<div className="mt-12 flex flex-col items-center justify-center gap-4 text-center">
+							<div className="flex size-12 items-center justify-center rounded-2xl bg-primary/12 text-primary shadow-sm">
 								<Bot className="size-6" aria-hidden="true" />
 							</div>
 							<div>
-								<h3 className="font-medium text-foreground">{disabled ? "Open a PDF First" : "How can I help you?"}</h3>
+								<h3 className="font-medium text-foreground">{disabled ? "Open a PDF first" : "How can I help?"}</h3>
 								<p className="text-sm text-muted-foreground mt-1 max-w-xs mx-auto">
 									{disabled
 										? "Upload a document to start analyzing."
@@ -235,7 +235,7 @@ export function ChatPanel({
 									<Button
 										variant="outline"
 										size="sm"
-										className="h-7 text-xs rounded-full bg-background"
+										className="h-7 rounded-full border-border/60 bg-card/90 text-xs"
 										onClick={onSummarize}
 									>
 										<Sparkles className="size-3 mr-1.5 text-primary" aria-hidden="true" />
@@ -252,8 +252,8 @@ export function ChatPanel({
 							<div key={message.id} className={cn("flex gap-3", isUser ? "flex-row-reverse" : "flex-row")}>
 								<div
 									className={cn(
-										"size-8 shrink-0 rounded-lg flex items-center justify-center text-xs font-medium",
-										isUser ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
+										"flex size-8 shrink-0 items-center justify-center rounded-xl text-xs font-medium",
+										isUser ? "bg-primary text-primary-foreground" : "bg-muted/80 text-muted-foreground",
 									)}
 								>
 									{isUser ? (
@@ -263,19 +263,19 @@ export function ChatPanel({
 									)}
 								</div>
 
-								<div className={cn("flex flex-col max-w-[85%] gap-1", isUser ? "items-end" : "items-start")}>
+								<div className={cn("flex max-w-[88%] flex-col gap-1", isUser ? "items-end" : "items-start")}>
 									{!isUser && message.meta && (
-										<span className="text-[10px] uppercase font-medium text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
+										<span className="rounded bg-muted/60 px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
 											{formatPageRange(message.meta)}
 										</span>
 									)}
 
 									<div
 										className={cn(
-											"px-4 py-2.5 rounded-2xl shadow-sm text-sm leading-relaxed",
+											"rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm",
 											isUser
-												? "bg-primary/10 text-foreground border border-primary/20 rounded-tr-sm selection:bg-primary/20 selection:text-foreground"
-												: "bg-card border border-border/50 rounded-tl-sm",
+												? "rounded-tr-sm border border-primary/25 bg-primary/12 text-foreground selection:bg-primary/25 selection:text-foreground"
+												: "rounded-tl-sm border border-border/60 bg-card/95",
 										)}
 									>
 										{isUser ? (
@@ -291,16 +291,16 @@ export function ChatPanel({
 
 					{streamingContent && (
 						<div className="flex gap-3 flex-row">
-							<div className="size-8 shrink-0 rounded-lg bg-muted flex items-center justify-center text-muted-foreground">
+							<div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-muted/80 text-muted-foreground">
 								<Bot className="size-4" aria-hidden="true" />
 							</div>
-							<div className="flex flex-col max-w-[85%] gap-1 items-start">
+							<div className="flex max-w-[88%] flex-col gap-1 items-start">
 								{streamingMeta && (
-									<span className="text-[10px] uppercase font-medium text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
+									<span className="rounded bg-muted/60 px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
 										{formatPageRange(streamingMeta)}
 									</span>
 								)}
-								<div className="px-4 py-2.5 rounded-2xl rounded-tl-sm bg-card border border-border/50 shadow-sm text-sm leading-relaxed w-full">
+								<div className="w-full rounded-2xl rounded-tl-sm border border-border/60 bg-card/95 px-4 py-2.5 text-sm leading-relaxed shadow-sm">
 									<MarkdownMessage content={streamingContent} showCaret />
 								</div>
 							</div>
@@ -309,16 +309,16 @@ export function ChatPanel({
 
 					{showLoadingIndicator && (
 						<div className="flex gap-3 flex-row">
-							<div className="size-8 shrink-0 rounded-lg bg-muted flex items-center justify-center text-muted-foreground">
+							<div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-muted/80 text-muted-foreground">
 								<Bot className="size-4" aria-hidden="true" />
 							</div>
-							<div className="flex flex-col max-w-[85%] gap-1 items-start">
+							<div className="flex max-w-[88%] flex-col gap-1 items-start">
 								{streamingMeta && (
-									<span className="text-[10px] uppercase font-medium text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
+									<span className="rounded bg-muted/60 px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
 										{formatPageRange(streamingMeta)}
 									</span>
 								)}
-								<div className="px-4 py-2.5 rounded-2xl rounded-tl-sm bg-card border border-border/50 shadow-sm text-sm leading-relaxed w-full">
+								<div className="w-full rounded-2xl rounded-tl-sm border border-border/60 bg-card/95 px-4 py-2.5 text-sm leading-relaxed shadow-sm">
 									<TypingIndicator />
 								</div>
 							</div>
@@ -327,18 +327,18 @@ export function ChatPanel({
 				</div>
 			</ScrollArea>
 
-			<div className="p-4 bg-background border-t border-border/40">
+			<div className="border-t border-border/60 bg-card/95 p-4">
 				<div className="relative max-w-3xl mx-auto">
 					{/* Selected highlights display - Removed old bulky list */}
 					<form
 						onSubmit={handleSubmit}
-						className="relative flex items-end gap-2 rounded-2xl border border-input bg-muted/20 shadow-sm focus-within:ring-1 focus-within:ring-ring transition-all hover:bg-muted/30"
+						className="relative flex items-end gap-2 rounded-2xl border border-input/85 bg-muted/35 shadow-sm transition-colors focus-within:border-primary/30 focus-within:ring-1 focus-within:ring-ring hover:bg-muted/45"
 					>
 						{!disabled && (
 							<div className="absolute left-3 top-0 -translate-y-1/2 flex items-center gap-2 max-w-[calc(100%-24px)] pointer-events-none">
 								{pageRange && (
 									<span
-										className="shrink-0 rounded-full border border-border/60 bg-background px-2 py-0.5 text-[10px] font-medium text-muted-foreground shadow-sm"
+										className="shrink-0 rounded-full border border-border/70 bg-card px-2 py-0.5 text-[10px] font-medium text-muted-foreground shadow-sm"
 										title="Current context page range"
 									>
 										{formatContextRange(pageRange)}
@@ -347,7 +347,7 @@ export function ChatPanel({
 								{selectedTexts.map((text, index) => (
 									<div
 										key={text}
-										className="pointer-events-auto flex items-center gap-1 shrink-0 rounded-full border border-primary/20 bg-primary/5 px-2 py-0.5 text-[10px] font-medium text-primary shadow-sm animate-in fade-in zoom-in-95 duration-200 group hover:bg-primary/10 transition-colors cursor-default max-w-[120px]"
+										className="pointer-events-auto group flex max-w-[120px] shrink-0 cursor-default items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary shadow-sm transition-colors hover:bg-primary/15 animate-in fade-in zoom-in-95 duration-200"
 										title={text}
 									>
 										<Quote className="size-2.5 opacity-50" aria-hidden="true" />
@@ -356,7 +356,7 @@ export function ChatPanel({
 											<button
 												type="button"
 												onClick={() => onRemoveSelection(index)}
-												className="ml-0.5 rounded-full p-0.5 hover:bg-destructive/20 hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"
+												className="ml-0.5 rounded-full p-0.5 opacity-0 transition-colors group-hover:opacity-100 hover:bg-destructive/20 hover:text-destructive"
 												aria-label={`Remove highlight: ${sanitizeAriaLabel(text)}`}
 											>
 												<X className="size-2.5" aria-hidden="true" />
@@ -376,7 +376,7 @@ export function ChatPanel({
 							onKeyDown={handleKeyDown}
 							placeholder={selectedTexts.length > 0 ? "Ask about the highlighted text…" : "Ask anything…"}
 							disabled={disabled || isLoading}
-							className="resize-none min-h-[50px] max-h-[200px] border-0 focus-visible:ring-0 bg-transparent py-3.5 pl-4 pr-12 shadow-none scrollbar-hide"
+							className="min-h-[50px] max-h-[200px] resize-none border-0 bg-transparent py-3.5 pl-4 pr-12 shadow-none scrollbar-hide focus-visible:ring-0"
 							rows={1}
 							style={{ height: input ? "auto" : "50px" }}
 							onInput={(event) => {
@@ -390,7 +390,7 @@ export function ChatPanel({
 							size="icon"
 							disabled={!input.trim() || disabled || isLoading}
 							className={cn(
-								"absolute right-1.5 bottom-1.5 size-8 rounded-xl transition-all",
+								"absolute bottom-1.5 right-1.5 size-8 rounded-xl transition-all",
 								input.trim()
 									? "bg-primary text-primary-foreground shadow-sm"
 									: "bg-transparent text-muted-foreground hover:bg-muted",
@@ -404,7 +404,7 @@ export function ChatPanel({
 							<span className="sr-only">Send</span>
 						</Button>
 					</form>
-					<div className="text-[10px] text-center text-muted-foreground mt-2 opacity-60">
+					<div className="mt-2 text-center text-[10px] text-muted-foreground/80">
 						AI can make mistakes. Please verify important information.
 					</div>
 				</div>

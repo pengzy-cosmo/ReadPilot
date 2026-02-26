@@ -45,11 +45,11 @@ export function SessionListModal({
 	};
 
 	return (
-		<div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
-			<Card className="w-full max-w-3xl h-[70vh] border-border/60 bg-background/95 shadow-2xl flex flex-col">
-				<CardHeader className="flex flex-row items-center justify-between gap-3 border-b border-border/40 px-6 py-4">
+		<div className="fixed inset-0 z-50 flex items-center justify-center bg-background/50 backdrop-blur-sm p-4">
+			<Card className="flex h-[70vh] w-full max-w-3xl flex-col rounded-2xl border-border/70 bg-card/95 shadow-2xl">
+				<CardHeader className="flex flex-row items-center justify-between gap-3 border-b border-border/60 px-6 py-4">
 					<div className="flex items-center gap-2">
-						<div className="size-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+						<div className="flex size-8 items-center justify-center rounded-lg bg-primary/12 text-primary">
 							<History className="size-4" aria-hidden="true" />
 						</div>
 						<div>
@@ -57,7 +57,13 @@ export function SessionListModal({
 							<p className="text-xs text-muted-foreground">Pick a recent conversation</p>
 						</div>
 					</div>
-					<Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
+					<Button
+						variant="ghost"
+						size="icon"
+						onClick={onClose}
+						aria-label="Close"
+						className="rounded-lg hover:bg-muted/70"
+					>
 						<X className="size-4" aria-hidden="true" />
 						<span className="sr-only">Close</span>
 					</Button>
@@ -74,10 +80,10 @@ export function SessionListModal({
 									<div
 										key={session.session_id}
 										className={cn(
-											"group w-full rounded-xl border px-4 py-3 text-left transition grid grid-cols-[1fr_auto] gap-4 items-center",
+											"group grid w-full grid-cols-[1fr_auto] items-center gap-4 rounded-xl border px-4 py-3 text-left transition",
 											isActive
-												? "border-primary/60 bg-primary/10"
-												: "border-border/50 bg-card/40 hover:bg-muted/40 hover:border-border",
+												? "border-primary/55 bg-primary/10"
+												: "border-border/60 bg-card/65 hover:border-border hover:bg-muted/45",
 										)}
 									>
 										<button
@@ -87,8 +93,8 @@ export function SessionListModal({
 										>
 											<div
 												className={cn(
-													"size-9 shrink-0 rounded-lg flex items-center justify-center",
-													isActive ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground",
+													"flex size-9 shrink-0 items-center justify-center rounded-lg",
+													isActive ? "bg-primary/15 text-primary" : "bg-muted/75 text-muted-foreground",
 												)}
 											>
 												<History className="size-4" aria-hidden="true" />
@@ -108,7 +114,7 @@ export function SessionListModal({
 										<Button
 											variant="ghost"
 											size="icon"
-											className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
+											className="shrink-0 text-destructive opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:bg-destructive/10 hover:text-destructive"
 											onClick={(e) => handleDelete(e, session.session_id)}
 											aria-label={`Delete session ${session.title || `Session ${sessions.length - index}`}`}
 										>

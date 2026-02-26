@@ -60,9 +60,11 @@ function ThumbnailItem({ pageNumber, pdf, isSelected, isCurrent, onSelect }: Thu
 		<button
 			type="button"
 			className={cn(
-				"group w-full rounded-lg border p-2 text-left transition-all duration-200 relative overflow-hidden",
-				isSelected ? "border-primary/50 bg-primary/5 shadow-sm" : "border-transparent hover:bg-muted/50",
-				isCurrent && "ring-2 ring-blue-500/80 ring-offset-1",
+				"group relative w-full overflow-hidden rounded-xl border p-2 text-left transition-all duration-200",
+				isSelected
+					? "border-primary/45 bg-primary/10 shadow-sm"
+					: "border-border/35 bg-card/40 hover:border-border/70 hover:bg-muted/50",
+				isCurrent && "ring-2 ring-primary/70 ring-offset-1",
 			)}
 			onClick={(event) => onSelect(pageNumber, event.shiftKey)}
 			title={`Select page ${pageNumber}`}
@@ -122,12 +124,12 @@ function OutlineTree({
 						<div
 							id={`outline-node-${item.id}`}
 							className={cn(
-								"group w-full flex items-center gap-1 rounded-sm pr-2 py-1 transition-colors text-sm cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring relative",
+								"group relative flex w-full cursor-pointer items-center gap-1 rounded-md py-1 pr-2 text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
 								isSelected
-									? "bg-primary/10 text-primary font-medium"
+									? "bg-primary/12 text-primary font-medium"
 									: showActiveIndicator
-										? "text-foreground font-medium bg-muted/40"
-										: "hover:bg-muted text-muted-foreground hover:text-foreground",
+										? "bg-muted/60 text-foreground font-medium"
+										: "text-muted-foreground hover:bg-muted/45 hover:text-foreground",
 							)}
 							role="button"
 							tabIndex={0}
@@ -144,7 +146,7 @@ function OutlineTree({
 							<button
 								type="button"
 								className={cn(
-									"flex items-center justify-center w-5 h-5 rounded-sm hover:bg-black/5 dark:hover:bg-white/10 shrink-0 focus-visible:ring-2 focus-visible:ring-ring outline-none transition-colors",
+									"flex h-5 w-5 shrink-0 items-center justify-center rounded-sm transition-colors outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
 									hasChildren ? "cursor-pointer" : "invisible pointer-events-none",
 								)}
 								onClick={(e) => {
@@ -167,8 +169,8 @@ function OutlineTree({
 									variant="ghost"
 									size="icon"
 									className={cn(
-										"h-5 w-5 opacity-0 group-hover:opacity-100 transition-all scale-90 hover:scale-100 shrink-0",
-										isSelected && "opacity-100 text-primary bg-background shadow-sm",
+										"h-5 w-5 shrink-0 scale-95 opacity-0 transition-all group-hover:scale-100 group-hover:opacity-100",
+										isSelected && "scale-100 opacity-100 bg-background text-primary shadow-sm",
 									)}
 									onClick={(event) => {
 										event.stopPropagation();
@@ -180,7 +182,7 @@ function OutlineTree({
 								</Button>
 							)}
 							{showActiveIndicator && !isSelected && (
-								<div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-1/2 bg-primary/60 rounded-r-full" />
+								<div className="absolute left-0 top-1/2 h-1/2 w-0.5 -translate-y-1/2 rounded-r-full bg-primary/60" />
 							)}
 						</div>
 						{hasChildren && isExpanded && (
@@ -325,8 +327,8 @@ function PdfSidebarComponent({
 	return (
 		<>
 			{/* Header with tabs */}
-			<div className="flex items-center justify-between p-3 border-b h-14 bg-background/50 backdrop-blur-sm shrink-0">
-				<div className="flex bg-muted/50 p-1 rounded-lg" role="tablist">
+			<div className="flex h-14 shrink-0 items-center justify-between border-b border-border/60 bg-card/70 p-3 backdrop-blur-sm">
+				<div className="flex rounded-lg bg-muted/60 p-1" role="tablist">
 					<button
 						type="button"
 						id="tab-outline"
@@ -335,9 +337,9 @@ function PdfSidebarComponent({
 						aria-controls="panel-outline"
 						tabIndex={sidebarTab === "outline" ? 0 : -1}
 						className={cn(
-							"px-3 py-1 text-xs font-medium rounded-md transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 outline-none",
+							"rounded-md px-3 py-1 text-xs font-medium transition-all outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
 							sidebarTab === "outline"
-								? "bg-background text-foreground shadow-sm"
+								? "bg-card text-foreground shadow-sm"
 								: "text-muted-foreground hover:text-foreground",
 						)}
 						onClick={() => onTabChange("outline")}
@@ -352,9 +354,9 @@ function PdfSidebarComponent({
 						aria-controls="panel-thumbnails"
 						tabIndex={sidebarTab === "thumbnails" ? 0 : -1}
 						className={cn(
-							"px-3 py-1 text-xs font-medium rounded-md transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 outline-none",
+							"rounded-md px-3 py-1 text-xs font-medium transition-all outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
 							sidebarTab === "thumbnails"
-								? "bg-background text-foreground shadow-sm"
+								? "bg-card text-foreground shadow-sm"
 								: "text-muted-foreground hover:text-foreground",
 						)}
 						onClick={() => onTabChange("thumbnails")}
@@ -365,7 +367,7 @@ function PdfSidebarComponent({
 				<Button
 					variant="ghost"
 					size="icon"
-					className="h-8 w-8 text-muted-foreground hover:text-foreground"
+					className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-muted/70 hover:text-foreground"
 					onClick={onClose}
 					aria-label="Close sidebar"
 				>
@@ -374,7 +376,7 @@ function PdfSidebarComponent({
 			</div>
 
 			{/* Content area - both panels always in DOM for aria-controls */}
-			<div className="flex-1 overflow-hidden p-3 scrollbar-thin flex flex-col">
+			<div className="scrollbar-thin flex flex-1 flex-col overflow-hidden p-3">
 				{/* Outline panel */}
 				<div
 					id="panel-outline"
@@ -396,7 +398,7 @@ function PdfSidebarComponent({
 							/>
 						</div>
 					) : (
-						<div className="p-8 text-center text-sm text-muted-foreground flex flex-col items-center gap-3 opacity-60">
+						<div className="flex flex-col items-center gap-3 p-8 text-center text-sm text-muted-foreground opacity-70">
 							<Menu className="h-8 w-8 opacity-20" aria-hidden="true" />
 							<p>No outline available</p>
 						</div>

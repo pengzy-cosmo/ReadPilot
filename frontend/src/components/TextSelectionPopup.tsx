@@ -174,11 +174,11 @@ export function TextSelectionPopup({
 				paddingBottom: "8px", // Add spacing from selection
 			}}
 		>
-			<div className="flex items-center gap-0.5 p-1 rounded-full bg-foreground/90 shadow-xl shadow-black/10 border border-border/10 ring-1 ring-black/5 animate-in fade-in zoom-in-95 duration-150">
+			<div className="flex items-center gap-0.5 rounded-full border border-border/70 bg-card/96 p-1 text-foreground shadow-lg backdrop-blur-sm animate-in fade-in zoom-in-95 duration-150">
 				<Button
 					size="sm"
 					onClick={() => handleAction("add")}
-					className="h-7 px-3 rounded-full hover:bg-white/20 text-background gap-1.5 border-0 bg-transparent"
+					className="h-7 rounded-full border-0 bg-transparent px-3 text-foreground hover:bg-muted/70 gap-1.5"
 					aria-label="Add to context list"
 				>
 					<Plus className="h-3.5 w-3.5" aria-hidden="true" />
@@ -187,11 +187,11 @@ export function TextSelectionPopup({
 
 				{onExplainSelection && (
 					<>
-						<div className="w-px h-3 bg-background/20 mx-0.5" aria-hidden="true" />
+						<div className="mx-0.5 h-3 w-px bg-border/70" aria-hidden="true" />
 						<Button
 							size="sm"
 							onClick={() => handleAction("explain")}
-							className="h-7 px-3 rounded-full hover:bg-white/20 text-background gap-1.5 border-0 bg-transparent"
+							className="h-7 rounded-full border-0 bg-transparent px-3 text-foreground hover:bg-muted/70 gap-1.5"
 							aria-label="Ask AI to explain this text"
 						>
 							<Sparkles className="h-3.5 w-3.5" aria-hidden="true" />

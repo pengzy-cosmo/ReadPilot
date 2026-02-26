@@ -123,14 +123,14 @@ function PdfToolbarComponent({
 	onRequestOpenFile,
 }: PdfToolbarProps) {
 	return (
-		<div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 flex items-center p-1 glass rounded-xl shadow-md border border-border/10 transition-all duration-300 max-w-[95vw] w-auto gap-1">
+		<div className="absolute left-1/2 top-3 z-20 flex w-auto max-w-[96vw] -translate-x-1/2 items-center gap-1 rounded-2xl border border-border/60 bg-card/85 p-1.5 shadow-lg backdrop-blur-md transition-all duration-200">
 			{/* Left: Sidebar & File */}
 			<div className="flex items-center gap-1 pl-1">
 				{!showSidebar && (
 					<Button
 						variant="ghost"
 						size="icon"
-						className="h-8 w-8 text-muted-foreground hover:text-foreground"
+						className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-muted/70 hover:text-foreground"
 						onClick={onShowSidebar}
 						aria-label="Show Sidebar"
 					>
@@ -140,7 +140,7 @@ function PdfToolbarComponent({
 				<Button
 					variant="ghost"
 					size="icon"
-					className="h-8 w-8 text-muted-foreground hover:text-foreground"
+					className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-muted/70 hover:text-foreground"
 					onClick={onRequestOpenFile}
 					aria-label="Open PDF"
 				>
@@ -155,7 +155,7 @@ function PdfToolbarComponent({
 				<Button
 					variant="ghost"
 					size="icon"
-					className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+					className="h-8 w-8 shrink-0 rounded-lg text-muted-foreground hover:bg-muted/70 hover:text-foreground"
 					onClick={() => onPageStep(-1)}
 					disabled={currentPage <= 1}
 					aria-label="Previous page"
@@ -163,7 +163,7 @@ function PdfToolbarComponent({
 					<ChevronLeft className="h-4 w-4" aria-hidden="true" />
 				</Button>
 
-				<div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted/50 border border-border/20 shadow-sm shrink-0 min-w-[80px] justify-center">
+				<div className="flex min-w-[88px] shrink-0 items-center justify-center gap-1.5 rounded-lg border border-border/60 bg-card/85 px-2.5 py-1 shadow-sm">
 					<label htmlFor="page-input" className="sr-only">
 						Current page
 					</label>
@@ -172,13 +172,13 @@ function PdfToolbarComponent({
 						type="text"
 						inputMode="numeric"
 						pattern="[0-9]*"
-						className="w-9 text-center text-sm p-0 border-none bg-transparent focus-visible:ring-0 font-semibold tabular-nums shadow-none h-auto shrink-0 leading-none text-foreground"
+						className="h-auto w-10 shrink-0 border-none bg-transparent p-0 text-center text-sm font-semibold leading-none text-foreground tabular-nums shadow-none focus-visible:ring-0"
 						value={pageInput}
 						onChange={(e) => onPageInputChange(e.target.value)}
 						onBlur={onPageInputCommit}
 						onKeyDown={(e) => e.key === "Enter" && onPageInputCommit()}
 					/>
-					<span className="text-xs text-muted-foreground/60 tabular-nums shrink-0 select-none font-medium">
+					<span className="shrink-0 select-none text-xs font-medium text-muted-foreground/70 tabular-nums">
 						/ {numPages}
 					</span>
 				</div>
@@ -186,7 +186,7 @@ function PdfToolbarComponent({
 				<Button
 					variant="ghost"
 					size="icon"
-					className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+					className="h-8 w-8 shrink-0 rounded-lg text-muted-foreground hover:bg-muted/70 hover:text-foreground"
 					onClick={() => onPageStep(1)}
 					disabled={currentPage >= numPages}
 					aria-label="Next page"
@@ -202,19 +202,19 @@ function PdfToolbarComponent({
 				<Button
 					variant="ghost"
 					size="icon"
-					className="h-8 w-8 text-muted-foreground hover:text-foreground shrink-0"
+					className="h-8 w-8 shrink-0 rounded-lg text-muted-foreground hover:bg-muted/70 hover:text-foreground"
 					onClick={onZoomOut}
 					aria-label="Zoom out"
 				>
 					<ZoomOut className="h-4 w-4" aria-hidden="true" />
 				</Button>
-				<span className="text-xs text-muted-foreground font-medium w-10 text-center tabular-nums shrink-0">
+				<span className="w-10 shrink-0 text-center text-xs font-medium text-muted-foreground tabular-nums">
 					{Math.round(effectiveScale * 100)}%
 				</span>
 				<Button
 					variant="ghost"
 					size="icon"
-					className="h-8 w-8 text-muted-foreground hover:text-foreground shrink-0"
+					className="h-8 w-8 shrink-0 rounded-lg text-muted-foreground hover:bg-muted/70 hover:text-foreground"
 					onClick={onZoomIn}
 					aria-label="Zoom in"
 				>
@@ -223,7 +223,7 @@ function PdfToolbarComponent({
 				<Button
 					variant="ghost"
 					size="icon"
-					className="h-8 w-8 text-muted-foreground hover:text-foreground shrink-0"
+					className="h-8 w-8 shrink-0 rounded-lg text-muted-foreground hover:bg-muted/70 hover:text-foreground"
 					onClick={onToggleFit}
 					aria-label={fitMode === "page-width" ? "Fit to Page" : "Fit to Width"}
 				>
@@ -242,8 +242,10 @@ function PdfToolbarComponent({
 				{/* AI context range indicator */}
 				<div
 					className={cn(
-						"flex items-center gap-1 rounded-md px-2 py-1 transition-all border shrink-0 mr-1",
-						localAutoFollow ? "bg-primary/10 border-primary/20" : "bg-muted/30 border-border/30 hover:bg-muted/50",
+						"mr-1 flex shrink-0 items-center gap-1 rounded-lg border px-2 py-1 transition-colors",
+						localAutoFollow
+							? "border-primary/30 bg-primary/10 text-primary"
+							: "border-border/60 bg-card/85 text-muted-foreground hover:bg-muted/55",
 					)}
 				>
 					<BrainCircuit
@@ -258,13 +260,13 @@ function PdfToolbarComponent({
 						type="text"
 						inputMode="numeric"
 						pattern="[0-9]*"
-						className="h-4 w-8 text-center text-[10px] p-0 border-none bg-transparent focus-visible:ring-0 font-medium tabular-nums text-foreground shadow-none shrink-0"
+						className="h-4 w-8 shrink-0 border-none bg-transparent p-0 text-center text-[11px] font-medium text-foreground tabular-nums shadow-none focus-visible:ring-0"
 						value={rangeInput.start}
 						onChange={(e) => onRangeStartChange(e.target.value)}
 						onBlur={onRangeStartCommit}
 						onKeyDown={(e) => e.key === "Enter" && onRangeStartCommit()}
 					/>
-					<span className="text-[9px] text-muted-foreground shrink-0 select-none" aria-hidden="true">
+					<span className="shrink-0 select-none text-[9px] text-muted-foreground" aria-hidden="true">
 						/
 					</span>
 					<label htmlFor="range-end" className="sr-only">
@@ -275,7 +277,7 @@ function PdfToolbarComponent({
 						type="text"
 						inputMode="numeric"
 						pattern="[0-9]*"
-						className="h-4 w-8 text-center text-[10px] p-0 border-none bg-transparent focus-visible:ring-0 font-medium tabular-nums text-foreground shadow-none shrink-0"
+						className="h-4 w-8 shrink-0 border-none bg-transparent p-0 text-center text-[11px] font-medium text-foreground tabular-nums shadow-none focus-visible:ring-0"
 						value={rangeInput.end}
 						onChange={(e) => onRangeEndChange(e.target.value)}
 						onBlur={onRangeEndCommit}
@@ -285,10 +287,10 @@ function PdfToolbarComponent({
 						type="button"
 						onClick={onAutoFollowToggle}
 						className={cn(
-							"ml-1 h-4 w-4 rounded-full flex items-center justify-center transition-colors shrink-0",
+							"ml-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full transition-colors",
 							localAutoFollow
 								? "text-primary hover:bg-primary/10"
-								: "text-muted-foreground hover:text-foreground hover:bg-muted",
+								: "text-muted-foreground hover:bg-muted hover:text-foreground",
 						)}
 						aria-label={localAutoFollow ? "Disable auto-follow" : "Enable auto-follow"}
 						aria-pressed={localAutoFollow}
@@ -300,7 +302,7 @@ function PdfToolbarComponent({
 				<Button
 					variant="ghost"
 					size="icon"
-					className="h-8 w-8 text-muted-foreground hover:text-foreground shrink-0"
+					className="h-8 w-8 shrink-0 rounded-lg text-muted-foreground hover:bg-muted/70 hover:text-foreground"
 					onClick={onSettingsToggle}
 					aria-label="AI Context Settings"
 					aria-expanded={isSettingsOpen}
@@ -311,7 +313,7 @@ function PdfToolbarComponent({
 				<Button
 					variant={isSearchOpen ? "secondary" : "ghost"}
 					size="icon"
-					className="h-8 w-8 text-muted-foreground hover:text-foreground shrink-0"
+					className="h-8 w-8 shrink-0 rounded-lg text-muted-foreground hover:bg-muted/70 hover:text-foreground"
 					onClick={onSearchToggle}
 					aria-label="Search"
 					aria-expanded={isSearchOpen}
@@ -321,8 +323,8 @@ function PdfToolbarComponent({
 
 				{/* Search Popup */}
 				{isSearchOpen && (
-					<div className="absolute top-full right-0 mt-3 z-30 w-72 bg-background/80 backdrop-blur-xl shadow-2xl rounded-2xl border border-white/20 dark:border-white/10 p-3 flex flex-col gap-3 animate-in fade-in zoom-in-95 slide-in-from-top-2 duration-200 origin-top-right ring-1 ring-black/5">
-						<div className="flex items-center gap-2 bg-muted/50 rounded-xl px-3 py-2 border border-white/5 transition-colors focus-within:bg-muted/70 focus-within:ring-1 focus-within:ring-primary/20">
+					<div className="absolute right-0 top-full z-30 mt-2.5 flex w-72 origin-top-right flex-col gap-3 rounded-xl border border-border/70 bg-popover/95 p-3 shadow-xl backdrop-blur-sm animate-in fade-in zoom-in-95 slide-in-from-top-2 duration-200">
+						<div className="flex items-center gap-2 rounded-lg border border-border/55 bg-muted/55 px-3 py-2 transition-colors focus-within:border-primary/25 focus-within:bg-muted/70">
 							<Search className="h-4 w-4 text-muted-foreground/70 shrink-0" aria-hidden="true" />
 							<label htmlFor="search-input" className="sr-only">
 								Search in document
@@ -331,7 +333,7 @@ function PdfToolbarComponent({
 								id="search-input"
 								ref={searchInputRef}
 								placeholder="Find in document…"
-								className="h-5 text-sm bg-transparent border-none focus-visible:ring-0 placeholder:text-muted-foreground/50 px-0 shadow-none file:bg-transparent"
+								className="h-5 border-none bg-transparent px-0 text-sm placeholder:text-muted-foreground/60 shadow-none focus-visible:ring-0 file:bg-transparent"
 								value={searchQuery}
 								onChange={(e) => onSearchQueryChange(e.target.value)}
 								onKeyDown={(e) => {
@@ -354,8 +356,8 @@ function PdfToolbarComponent({
 								</button>
 							)}
 						</div>
-						<div className="flex items-center justify-between text-xs text-muted-foreground px-1">
-							<span className="font-medium truncate max-w-[120px] select-none">
+						<div className="flex items-center justify-between px-1 text-xs text-muted-foreground">
+							<span className="max-w-[120px] select-none truncate font-medium">
 								{searchHits.length > 0
 									? `${searchIndex + 1} of ${searchHits.length} results`
 									: isSearching
@@ -366,7 +368,7 @@ function PdfToolbarComponent({
 								<Button
 									variant="ghost"
 									size="icon"
-									className="h-7 w-7 rounded-lg hover:bg-primary/10 hover:text-primary transition-all"
+									className="h-7 w-7 rounded-lg transition-colors hover:bg-primary/10 hover:text-primary"
 									onClick={onSearchPrev}
 									disabled={!searchHits.length}
 									aria-label="Previous result"
@@ -376,7 +378,7 @@ function PdfToolbarComponent({
 								<Button
 									variant="ghost"
 									size="icon"
-									className="h-7 w-7 rounded-lg hover:bg-primary/10 hover:text-primary transition-all"
+									className="h-7 w-7 rounded-lg transition-colors hover:bg-primary/10 hover:text-primary"
 									onClick={onSearchNext}
 									disabled={!searchHits.length}
 									aria-label="Next result"
@@ -390,11 +392,11 @@ function PdfToolbarComponent({
 
 				{/* Settings Popup */}
 				{isSettingsOpen && (
-					<div className="absolute top-full right-0 mt-3 z-30 w-64 bg-background/80 backdrop-blur-xl shadow-2xl rounded-2xl border border-white/20 dark:border-white/10 p-4 flex flex-col gap-4 animate-in fade-in zoom-in-95 slide-in-from-top-2 duration-200 origin-top-right ring-1 ring-black/5">
+					<div className="absolute right-0 top-full z-30 mt-2.5 flex w-64 origin-top-right flex-col gap-4 rounded-xl border border-border/70 bg-popover/95 p-4 shadow-xl backdrop-blur-sm animate-in fade-in zoom-in-95 slide-in-from-top-2 duration-200">
 						<div className={cn("space-y-3", !localAutoFollow && "opacity-60 grayscale-[0.5] transition-all")}>
 							<div className="flex items-center justify-between">
 								<span className="text-xs font-semibold text-foreground/80">Context Window</span>
-								<span className="bg-primary/10 text-primary px-2 py-0.5 rounded-md text-[11px] font-mono font-medium border border-primary/20">
+								<span className="rounded-md border border-primary/20 bg-primary/10 px-2 py-0.5 text-[11px] font-mono font-medium text-primary">
 									±{contextWindowSize}
 								</span>
 							</div>
@@ -429,14 +431,14 @@ function PdfToolbarComponent({
 						</div>
 
 						{/* Mobile zoom controls */}
-						<div className="sm:hidden space-y-3 pt-3 border-t border-border/10">
+						<div className="space-y-3 border-t border-border/20 pt-3 sm:hidden">
 							<div className="text-xs font-semibold text-foreground/80">Zoom Level</div>
 							<div className="flex items-center gap-2 justify-between">
-								<div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1 border border-white/5">
+								<div className="flex items-center gap-1 rounded-lg border border-border/60 bg-muted/50 p-1">
 									<Button
 										variant="ghost"
 										size="icon"
-										className="h-7 w-7 rounded-md hover:bg-background hover:shadow-sm"
+										className="h-7 w-7 rounded-md hover:bg-card"
 										onClick={onZoomOut}
 										aria-label="Zoom out"
 									>
@@ -448,7 +450,7 @@ function PdfToolbarComponent({
 									<Button
 										variant="ghost"
 										size="icon"
-										className="h-7 w-7 rounded-md hover:bg-background hover:shadow-sm"
+										className="h-7 w-7 rounded-md hover:bg-card"
 										onClick={onZoomIn}
 										aria-label="Zoom in"
 									>
@@ -458,7 +460,7 @@ function PdfToolbarComponent({
 								<Button
 									variant="outline"
 									size="icon"
-									className="h-9 w-9 rounded-lg bg-transparent border-white/10 hover:bg-muted/50"
+									className="h-9 w-9 rounded-lg border-border/60 bg-transparent hover:bg-muted/60"
 									onClick={onToggleFit}
 									aria-label={fitMode === "page-width" ? "Fit to Page" : "Fit to Width"}
 								>

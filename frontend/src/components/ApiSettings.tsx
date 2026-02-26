@@ -52,8 +52,8 @@ export function ApiSettings({ isOpen, onClose, config, onSave }: ApiSettingsProp
 	const modelId = "api-model";
 
 	return (
-		<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-			<Card className="w-full max-w-md">
+		<div className="fixed inset-0 z-50 flex items-center justify-center bg-background/50 p-4 backdrop-blur-sm">
+			<Card className="w-full max-w-md rounded-2xl border-border/70 bg-card/95 shadow-2xl">
 				<CardHeader>
 					<CardTitle>API Settings</CardTitle>
 				</CardHeader>
@@ -66,7 +66,7 @@ export function ApiSettings({ isOpen, onClose, config, onSave }: ApiSettingsProp
 							id={providerId}
 							value={localConfig.provider}
 							onChange={(e) => handleProviderChange(e.target.value as LLMProvider)}
-							className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+							className="flex h-9 w-full rounded-md border border-input bg-card px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
 						>
 							{PROVIDERS.map((p) => (
 								<option key={p} value={p}>
@@ -120,10 +120,12 @@ export function ApiSettings({ isOpen, onClose, config, onSave }: ApiSettingsProp
 					</div>
 
 					<div className="flex justify-end gap-2 pt-4">
-						<Button variant="outline" onClick={onClose}>
+						<Button variant="outline" onClick={onClose} className="rounded-full border-border/70 bg-card/80">
 							Cancel
 						</Button>
-						<Button onClick={handleSave}>Save</Button>
+						<Button onClick={handleSave} className="rounded-full px-4">
+							Save
+						</Button>
 					</div>
 				</CardContent>
 			</Card>

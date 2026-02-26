@@ -55,15 +55,15 @@ export function UploadZone({ onFileSelect, isUploading }: UploadZoneProps) {
 	}, [isUploading]);
 
 	return (
-		<div className="flex-1 flex flex-col items-center justify-center p-4">
+		<div className="flex flex-1 flex-col items-center justify-center p-6 sm:p-8">
 			<button
 				type="button"
 				className={cn(
-					"relative group w-full max-w-lg aspect-video rounded-3xl border-2 border-dashed transition-all duration-300 ease-out flex flex-col items-center justify-center p-8 text-center focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 outline-none",
+					"group relative flex w-full max-w-3xl min-h-[320px] flex-col items-center justify-center rounded-3xl border-2 border-dashed p-8 text-center outline-none transition-all duration-200 ease-out focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
 					isUploading ? "cursor-not-allowed" : "cursor-pointer",
 					isDragging
-						? "border-primary bg-primary/5 scale-[1.02]"
-						: "border-border hover:border-primary/50 hover:bg-muted/30",
+						? "scale-[1.01] border-primary/60 bg-primary/10"
+						: "border-border/70 bg-card/55 hover:border-primary/35 hover:bg-card/75",
 				)}
 				onDragOver={handleDragOver}
 				onDragLeave={handleDragLeave}
@@ -72,24 +72,26 @@ export function UploadZone({ onFileSelect, isUploading }: UploadZoneProps) {
 				disabled={isUploading}
 				aria-label="Upload PDF file"
 			>
-				<div className="absolute inset-0 bg-gradient-to-tr from-primary/5 via-transparent to-primary/5 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity" />
+				<div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-primary/10 via-transparent to-accent/10 opacity-0 transition-opacity group-hover:opacity-100" />
 
 				<div className="relative z-10 flex flex-col items-center gap-4">
-					<div className="p-4 rounded-2xl bg-background shadow-lg shadow-primary/5 group-hover:scale-110 transition-transform duration-300 border border-border/50">
+					<div className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm transition-transform duration-200 group-hover:scale-105">
 						{isUploading ? (
 							<Loader2 className="size-8 text-primary animate-spin" aria-hidden="true" />
 						) : isDragging ? (
 							<FileUp className="size-8 text-primary animate-bounce" aria-hidden="true" />
 						) : (
 							<Upload
-								className="size-8 text-muted-foreground group-hover:text-primary transition-colors"
+								className="size-8 text-muted-foreground transition-colors group-hover:text-primary"
 								aria-hidden="true"
 							/>
 						)}
 					</div>
 
-					<div className="space-y-1">
-						<h3 className="text-xl font-medium tracking-tight">{isUploading ? "Uploading…" : "Drop your PDF here"}</h3>
+					<div className="space-y-1.5">
+						<h3 className="text-xl font-semibold tracking-tight text-foreground">
+							{isUploading ? "Uploading…" : "Drop your PDF here"}
+						</h3>
 						<p className="text-sm text-muted-foreground">or click to browse from your computer</p>
 					</div>
 				</div>
@@ -104,8 +106,8 @@ export function UploadZone({ onFileSelect, isUploading }: UploadZoneProps) {
 				/>
 			</button>
 
-			<div className="mt-8 text-center space-y-2">
-				<div className="flex items-center justify-center gap-4 text-xs text-muted-foreground/60">
+			<div className="mt-8 space-y-2 text-center">
+				<div className="flex items-center justify-center gap-4 text-xs text-muted-foreground/70">
 					<span>Secure Processing</span>
 					<span>•</span>
 					<span>Smart Analysis</span>

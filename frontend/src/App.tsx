@@ -444,60 +444,72 @@ function App() {
 
 			<Header
 				isUploading={isUploading}
+				readingMeta={
+					docId && docInfo
+						? {
+								currentPage,
+								totalPages: docInfo.total_pages,
+								pageRange,
+							}
+						: null
+				}
 				onOpenLibrary={handleOpenBookshelf}
 				onOpenSettings={() => setShowSettings(true)}
 			/>
-			<div className="h-14 shrink-0" />
 
-			{!docId ? (
-				<UploadZone onFileSelect={handleZoneSelect} isUploading={isUploading || initialLoading} />
-			) : (
-				<Group orientation="horizontal" style={{ flex: 1, overflow: "hidden" }} className="min-w-0">
-					<Panel defaultSize={75} minSize={20} className="bg-muted/30">
-						<PdfViewer
-							sourceUrl={fileUrl}
-							onRequestOpenFile={handleRequestOpenFile}
-							pageRange={pageRange}
-							onPageRangeChange={setPageRange}
-							onCurrentPageChange={setCurrentPage}
-							onTextSelect={handleAddSelection}
-							onExplainText={handleExplainSelection}
-							initialPage={initialPage}
-							initialAutoFollow={true}
-							initialContextWindow={3}
+			<div className="flex-1 min-h-0 px-3 pb-3 pt-2 sm:px-4 sm:pb-4 sm:pt-3">
+				{!docId ? (
+					<div className="surface-shell flex h-full min-h-0 overflow-hidden">
+						<UploadZone onFileSelect={handleZoneSelect} isUploading={isUploading || initialLoading} />
+					</div>
+				) : (
+					<Group orientation="horizontal" className="surface-shell h-full min-w-0 overflow-hidden">
+						<Panel defaultSize={76} minSize={18} className="bg-transparent">
+							<PdfViewer
+								sourceUrl={fileUrl}
+								onRequestOpenFile={handleRequestOpenFile}
+								pageRange={pageRange}
+								onPageRangeChange={setPageRange}
+								onCurrentPageChange={setCurrentPage}
+								onTextSelect={handleAddSelection}
+								onExplainText={handleExplainSelection}
+								initialPage={initialPage}
+								initialAutoFollow={true}
+								initialContextWindow={3}
+							/>
+						</Panel>
+
+						<Separator
+							style={{
+								width: "1px",
+								background: "var(--border)",
+								cursor: "col-resize",
+							}}
+							className="shrink-0 opacity-60 transition-colors hover:bg-primary/70"
 						/>
-					</Panel>
 
-					<Separator
-						style={{
-							width: "1px",
-							background: "var(--border)",
-							cursor: "col-resize",
-						}}
-						className="shrink-0 transition-colors hover:bg-primary/50"
-					/>
-
-					<Panel defaultSize={25} minSize={25} className="bg-background relative h-full flex flex-col min-h-0 min-w-0">
-						<ChatPanel
-							onSendMessage={handleSendMessage}
-							onSummarize={handleSummarize}
-							onNewSession={handleNewSession}
-							onClear={handleClearSession}
-							onOpenSessions={handleOpenSessionList}
-							sessionTitle={sessionTitle}
-							sessionSubtitle={sessionSubtitle}
-							pageRange={docId ? pageRange : null}
-							selectedTexts={selectedTexts}
-							onRemoveSelection={handleRemoveSelection}
-							messages={messages}
-							isLoading={isLoading}
-							streamingContent={streamingContent}
-							streamingMeta={streamingMeta}
-							disabled={!docId || !sessionId || isUploading}
-						/>
-					</Panel>
-				</Group>
-			)}
+						<Panel defaultSize={24} minSize={20} className="relative flex h-full min-h-0 min-w-0 bg-background/45">
+							<ChatPanel
+								onSendMessage={handleSendMessage}
+								onSummarize={handleSummarize}
+								onNewSession={handleNewSession}
+								onClear={handleClearSession}
+								onOpenSessions={handleOpenSessionList}
+								sessionTitle={sessionTitle}
+								sessionSubtitle={sessionSubtitle}
+								pageRange={docId ? pageRange : null}
+								selectedTexts={selectedTexts}
+								onRemoveSelection={handleRemoveSelection}
+								messages={messages}
+								isLoading={isLoading}
+								streamingContent={streamingContent}
+								streamingMeta={streamingMeta}
+								disabled={!docId || !sessionId || isUploading}
+							/>
+						</Panel>
+					</Group>
+				)}
+			</div>
 
 			<BookshelfModal
 				isOpen={showBookshelf}

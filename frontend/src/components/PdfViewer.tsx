@@ -868,7 +868,7 @@ export function PdfViewer({
 	return (
 		<Group
 			orientation="horizontal"
-			className="h-full bg-muted/5"
+			className="h-full bg-transparent"
 			id="pdf-viewer"
 			defaultLayout={groupDefaultLayout}
 			elementRef={groupRef}
@@ -880,7 +880,7 @@ export function PdfViewer({
 						id="sidebar-panel"
 						defaultSize={sidebarSizes.defaultPercent}
 						minSize={sidebarSizes.minPercent}
-						className="flex flex-col bg-background border-r z-10 shadow-sm"
+						className="z-10 flex flex-col border-r border-border/70 bg-card/85 backdrop-blur-sm"
 					>
 						<PdfSidebar
 							sidebarTab={sidebarTab}
@@ -901,14 +901,14 @@ export function PdfViewer({
 							onClose={() => setShowSidebar(false)}
 						/>
 					</Panel>
-					<Separator className="w-2 -ml-1 bg-transparent hover:bg-primary/10 transition-colors cursor-col-resize z-50 flex justify-center">
+					<Separator className="z-50 -ml-1 flex w-2 cursor-col-resize justify-center bg-transparent transition-colors hover:bg-primary/10">
 						<div className="w-px h-full bg-border/50" />
 					</Separator>
 				</>
 			)}
 
 			{/* Viewer Panel */}
-			<Panel id="viewer-panel" minSize={VIEWER_MIN_SIZE} className="relative flex flex-col bg-muted/30">
+			<Panel id="viewer-panel" minSize={VIEWER_MIN_SIZE} className="relative flex flex-col bg-transparent">
 				{/* Floating Toolbar */}
 				{numPages > 0 && (
 					<PdfToolbar
@@ -982,8 +982,8 @@ export function PdfViewer({
 										defaultItemHeight={pageRenderSize ? pageRenderSize.height + PAGE_GAP : 800}
 										increaseViewportBy={pageRenderSize ? pageRenderSize.height * VIEWPORT_BUFFER_PAGES : 1600}
 										components={{
-											Header: () => <div style={{ height: 90 }} />,
-											Footer: () => <div style={{ height: 40 }} />,
+											Header: () => <div style={{ height: 72 }} />,
+											Footer: () => <div style={{ height: 24 }} />,
 										}}
 										itemContent={(index) => {
 											const pageNumber = index + 1;
@@ -993,13 +993,15 @@ export function PdfViewer({
 											if (activeQuery) resetPageHitCounter(pageNumber);
 											return (
 												<div
-													className="pdf-page-wrapper relative"
+													className="pdf-page-wrapper relative px-3 md:px-4"
 													style={pageRenderSize ? { height: pageRenderSize.height + PAGE_GAP } : undefined}
 												>
 													<div
 														className={cn(
-															"pdf-page transition-all duration-300 relative",
-															isInContext ? "ring-1 ring-primary/30 shadow-lg" : "shadow-md hover:shadow-lg",
+															"pdf-page relative transition-[box-shadow,border-color,transform] duration-200",
+															isInContext
+																? "ring-1 ring-primary/35 border-primary/30 shadow-xl"
+																: "border-border/70 shadow-lg hover:shadow-xl",
 														)}
 													>
 														<Page
@@ -1041,19 +1043,21 @@ export function PdfViewer({
 							</div>
 						) : (
 							/* Empty State */
-							<div className="flex flex-col h-full items-center justify-center text-sm text-muted-foreground gap-6 animate-in fade-in duration-500">
-								<div className="p-8 rounded-full bg-muted/30 border border-border/50 shadow-sm">
-									<FileText className="h-16 w-16 opacity-10" aria-hidden="true" />
+							<div className="flex h-full flex-col items-center justify-center gap-5 p-6 text-sm text-muted-foreground animate-in fade-in duration-500">
+								<div className="surface-panel flex max-w-md flex-col items-center gap-4 px-8 py-10 text-center">
+									<div className="rounded-2xl bg-muted/70 p-4 text-muted-foreground">
+										<FileText className="h-10 w-10 opacity-75" aria-hidden="true" />
+									</div>
+									<div className="space-y-2">
+										<p className="text-base font-semibold text-foreground">Open a PDF to start reading</p>
+										<p className="max-w-xs text-sm text-muted-foreground">
+											Use the left canvas for focused reading and the right panel for quick AI analysis.
+										</p>
+									</div>
+									<Button onClick={onRequestOpenFile} className="rounded-full px-5">
+										Open Document
+									</Button>
 								</div>
-								<div className="text-center space-y-2">
-									<p className="text-lg font-medium text-foreground">No Document Loaded</p>
-									<p className="max-w-xs mx-auto opacity-70">
-										Upload a PDF to start reading and chatting with your personal AI assistant.
-									</p>
-								</div>
-								<Button onClick={onRequestOpenFile} className="mt-4 shadow-lg shadow-primary/20">
-									Open Document
-								</Button>
 							</div>
 						)}
 
