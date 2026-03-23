@@ -1,54 +1,26 @@
-import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area";
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
-const ScrollArea = React.forwardRef<HTMLDivElement, React.ComponentProps<typeof ScrollAreaPrimitive.Root>>(
+const ScrollArea = React.forwardRef<HTMLDivElement, React.ComponentProps<"div">>(
 	({ className, children, ...props }, ref) => {
 		return (
-			<ScrollAreaPrimitive.Root
-				ref={ref}
-				data-slot="scroll-area"
-				className={cn("relative overflow-hidden", className)}
-				{...props}
-			>
-				<ScrollAreaPrimitive.Viewport
-					data-slot="scroll-area-viewport"
-					className="focus-visible:ring-ring/50 size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:outline-1"
-				>
+			<div ref={ref} data-slot="scroll-area" className={cn("relative overflow-hidden", className)} {...props}>
+				<div data-slot="scroll-area-viewport" className="size-full rounded-[inherit] overflow-auto">
 					{children}
-				</ScrollAreaPrimitive.Viewport>
-				<ScrollBar />
-				<ScrollAreaPrimitive.Corner />
-			</ScrollAreaPrimitive.Root>
+				</div>
+			</div>
 		);
 	},
 );
 ScrollArea.displayName = "ScrollArea";
 
 function ScrollBar({
-	className,
-	orientation = "vertical",
-	...props
-}: React.ComponentProps<typeof ScrollAreaPrimitive.ScrollAreaScrollbar>) {
-	return (
-		<ScrollAreaPrimitive.ScrollAreaScrollbar
-			data-slot="scroll-area-scrollbar"
-			orientation={orientation}
-			className={cn(
-				"flex touch-none p-px transition-colors select-none",
-				orientation === "vertical" && "h-full w-2.5 border-l border-l-transparent",
-				orientation === "horizontal" && "h-2.5 flex-col border-t border-t-transparent",
-				className,
-			)}
-			{...props}
-		>
-			<ScrollAreaPrimitive.ScrollAreaThumb
-				data-slot="scroll-area-thumb"
-				className="bg-border relative flex-1 rounded-full"
-			/>
-		</ScrollAreaPrimitive.ScrollAreaScrollbar>
-	);
+	className: _className,
+	orientation: _orientation = "vertical",
+}: React.ComponentProps<"div"> & { orientation?: "vertical" | "horizontal" }) {
+	// Native CSS scrollbar handles rendering; this component is kept for API compatibility
+	return null;
 }
 
 export { ScrollArea, ScrollBar };
